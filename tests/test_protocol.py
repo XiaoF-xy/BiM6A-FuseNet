@@ -5,6 +5,7 @@ from collections import Counter
 from pathlib import Path
 
 import numpy as np
+import pytest
 from sklearn.model_selection import StratifiedKFold
 
 from configs.configarg import load_experiment_config
@@ -37,3 +38,8 @@ def test_seed_42_stratified_folds_cover_benchmark_once_without_overlap():
         assert Counter(labels[validation_indices])[0] == Counter(labels[validation_indices])[1]
         seen_validation.extend(validation_indices.tolist())
     assert sorted(seen_validation) == indices.tolist()
+
+
+def test_v1_rejects_a_seed_that_would_change_the_mke_comparison_protocol():
+    with pytest.raises(ValueError, match="seed at 42"):
+        load_experiment_config("v1_baseline", "H_b", seed=7)

@@ -57,6 +57,16 @@ def test_five_model_soft_voting_averages_probabilities(tmp_path: Path):
         path = tmp_path / f"fold_{index}.csv"
         write_predictions(path, probabilities)
         files.append(path)
+    with files[-1].open(newline="", encoding="utf-8") as handle:
+        shuffled_rows = list(csv.DictReader(handle))[::-1]
+    with files[-1].open("w", newline="", encoding="utf-8") as handle:
+        writer = csv.DictWriter(
+            handle,
+            fieldnames=["sample_id", "sequence", "label", "prob", "pred"],
+            lineterminator="\n",
+        )
+        writer.writeheader()
+        writer.writerows(shuffled_rows)
 
     rows, metrics = ensemble_prediction_files(files)
 

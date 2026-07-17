@@ -54,7 +54,19 @@ plots/
 
 ## 迁移到服务器
 
-请复制整个 `BiM6A-FuseNet` 文件夹，包括 `pretrained/birna-bert-model/pytorch_model.bin`。该权重约 447 MB，SHA-256 为：
+先在本机确认目录完整：
+
+```bash
+python scripts/verify_portable.py
+```
+
+请复制整个 `BiM6A-FuseNet` 文件夹，包括 `pretrained/birna-bert-model/pytorch_model.bin`。为了避免把本地 Git 历史和输出一起传输，推荐：
+
+```bash
+rsync -av --exclude .git --exclude outputs BiM6A-FuseNet/ user@server:/path/BiM6A-FuseNet/
+```
+
+不要仅使用普通 `git clone` 部署：447 MB 权重超过常见 Git 托管的单文件限制，因此本地 Git 忽略该文件；`rsync`、`scp` 或 Finder 复制完整文件夹才会带上它。权重 SHA-256 为：
 
 ```text
 4833ca3207d1908a86acffc84d6435379ab65c8da8f1790065c3c683bdacef3b

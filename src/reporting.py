@@ -69,14 +69,19 @@ def ensemble_prediction_files(paths: list[Path]) -> tuple[list[dict], dict[str, 
     folds = [read_prediction_file(path) for path in paths]
     reference = folds[0]
     reference_keys = [(row["sample_id"], row["sequence"], row["label"]) for row in reference]
-    for path, fold in zip(paths[1:], folds[1:]):
-        keys = [(row["sample_id"], row["sequence"], row["label"]) for row in fold]
-        if keys != reference_keys:
+    fold_maps = []
+    for path, fold in zip(paths, folds):
+        fold_map = {
+            (row["sample_id"], row["sequence"], row["label"]): row
+            for row in fold
+        }
+        if set(fold_map) != set(reference_keys):
             raise ValueError(f"Five-model prediction files are not aligned: {path}")
+        fold_maps.append(fold_map)
 
     output = []
-    for index, reference_row in enumerate(reference):
-        probability = float(np.mean([fold[index]["prob"] for fold in folds]))
+    for reference_row, key in zip(reference, reference_keys):
+        probability = float(np.mean([fold_map[key]["prob"] for fold_map in fold_maps]))
         output.append(
             {
                 "sample_id": reference_row["sample_id"],
