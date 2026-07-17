@@ -1,7 +1,6 @@
 from __future__ import annotations
 
 import argparse
-import csv
 import gc
 import json
 import math
@@ -22,6 +21,7 @@ from reporting import (
     ensemble_prediction_files,
     read_prediction_file,
     summarize_metrics,
+    write_benchmark_cv_csv,
     write_prediction_file,
 )
 from model_birna_dual_view import BiRNADualViewClassifier
@@ -434,7 +434,7 @@ def train_one_fold(
         "best_epoch": best_epoch,
         "best_score": best_score,
         "selection_metric": args.selection_metric,
-        "best_model_path": None,
+        "best_model_path": str(best_model_path),
         "best_model_deleted": False,
         "benchmark_validation_loss": val_loss,
         "benchmark_validation_metrics": selected_val_metrics,
@@ -462,6 +462,7 @@ def train_one_fold(
         json.load(handle)
     best_model_deleted = delete_temporary_checkpoint(best_model_path)
     fold_payload["best_model_deleted"] = best_model_deleted
+    fold_payload["best_model_path"] = None if best_model_deleted else str(best_model_path)
     with metrics_path.open("w", encoding="utf-8") as handle:
         json.dump(json_safe_metrics(fold_payload), handle, indent=2, ensure_ascii=False)
 
@@ -482,28 +483,6 @@ def train_one_fold(
 def summarize_folds(fold_results: list[dict]) -> dict:
     benchmark = summarize_metrics([result["benchmark_validation_metrics"] for result in fold_results])
     return {"folds": fold_results, "benchmark_cv_mean": benchmark["mean"], "benchmark_cv_std": benchmark["std"]}
-
-
-def save_cv_summary_csv(path: Path, fold_results: list[dict], summary: dict):
-    with path.open("w", newline="", encoding="utf-8") as handle:
-        fieldnames = ["fold", "best_epoch", "best_score", "benchmark_validation_loss"] + METRIC_KEYS
-        writer = csv.DictWriter(handle, fieldnames=fieldnames, lineterminator="\n")
-        writer.writeheader()
-        for result in fold_results:
-            row = {
-                "fold": result["fold"],
-                "best_epoch": result["best_epoch"],
-                "best_score": result["best_score"],
-                "benchmark_validation_loss": result["benchmark_validation_loss"],
-            }
-            row.update(result["benchmark_validation_metrics"])
-            writer.writerow(row)
-        mean_row = {"fold": "mean", "best_epoch": "", "best_score": "", "benchmark_validation_loss": ""}
-        mean_row.update(summary["benchmark_cv_mean"])
-        writer.writerow(mean_row)
-        std_row = {"fold": "std", "best_epoch": "", "best_score": "", "benchmark_validation_loss": ""}
-        std_row.update(summary["benchmark_cv_std"])
-        writer.writerow(std_row)
 
 
 def main():
@@ -647,7 +626,12 @@ def main():
     summary["args"] = {key: str(value) if isinstance(value, Path) else value for key, value in vars(args).items()}
     with (args.output_dir / "benchmark_cv_summary.json").open("w", encoding="utf-8") as handle:
         json.dump(json_safe_metrics(summary), handle, indent=2, ensure_ascii=False)
-    save_cv_summary_csv(args.output_dir / "benchmark_cv_metrics.csv", fold_results, summary)
+    write_benchmark_cv_csv(
+        args.output_dir / "benchmark_cv_metrics.csv",
+        fold_results,
+        summary["benchmark_cv_mean"],
+        summary["benchmark_cv_std"],
+    )
 
     ensemble_rows, ensemble_metrics = ensemble_prediction_files(
         [args.output_dir / f"fold_{fold_idx:02d}" / "independent_predictions.csv" for fold_idx in range(1, 6)]

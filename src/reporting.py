@@ -22,6 +22,7 @@ SUMMARY_METRICS = [
     "Sensitivity",
     "Specificity",
 ]
+COUNT_METRICS = ["TP", "TN", "FP", "FN"]
 PREDICTION_FIELDS = ["sample_id", "sequence", "label", "prob", "pred"]
 
 
@@ -99,3 +100,38 @@ def summarize_metrics(metrics_per_fold: list[dict]) -> dict[str, dict[str, float
         summary["mean"][key] = float(np.mean(values))
         summary["std"][key] = float(np.std(values, ddof=1)) if len(values) > 1 else 0.0
     return summary
+
+
+def write_benchmark_cv_csv(
+    path: Path,
+    fold_results: list[dict],
+    benchmark_mean: dict,
+    benchmark_std: dict,
+) -> None:
+    fieldnames = ["fold", "best_epoch", "best_score", "benchmark_validation_loss"] + SUMMARY_METRICS + COUNT_METRICS
+    with Path(path).open("w", newline="", encoding="utf-8") as handle:
+        writer = csv.DictWriter(handle, fieldnames=fieldnames, lineterminator="\n")
+        writer.writeheader()
+        for result in fold_results:
+            metrics = result["benchmark_validation_metrics"]
+            writer.writerow(
+                {
+                    "fold": result["fold"],
+                    "best_epoch": result["best_epoch"],
+                    "best_score": result["best_score"],
+                    "benchmark_validation_loss": result["benchmark_validation_loss"],
+                    **{key: metrics.get(key, "") for key in SUMMARY_METRICS + COUNT_METRICS},
+                }
+            )
+        writer.writerow(
+            {
+                "fold": "mean",
+                **{key: benchmark_mean.get(key, "") for key in SUMMARY_METRICS},
+            }
+        )
+        writer.writerow(
+            {
+                "fold": "std",
+                **{key: benchmark_std.get(key, "") for key in SUMMARY_METRICS},
+            }
+        )

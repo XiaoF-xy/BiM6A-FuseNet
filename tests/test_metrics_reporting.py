@@ -11,7 +11,7 @@ ROOT = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(ROOT / "src"))
 
 from metrics_utils import compute_binary_metrics  # noqa: E402
-from reporting import ensemble_prediction_files, summarize_metrics  # noqa: E402
+from reporting import ensemble_prediction_files, summarize_metrics, write_benchmark_cv_csv  # noqa: E402
 
 
 def write_predictions(path: Path, probabilities: list[float]) -> None:
@@ -89,3 +89,21 @@ def test_cross_validation_summary_uses_sample_standard_deviation():
     summary = summarize_metrics([{"ACC": 0.8}, {"ACC": 1.0}])
     assert summary["mean"]["ACC"] == pytest.approx(0.9)
     assert summary["std"]["ACC"] == pytest.approx(2**0.5 / 10)
+
+
+def test_benchmark_csv_accepts_confusion_counts(tmp_path: Path):
+    metrics = compute_binary_metrics([0, 0, 1, 1], [0.1, 0.8, 0.9, 0.7])
+    result = {
+        "fold": 1,
+        "best_epoch": 3,
+        "best_score": metrics["ACC"],
+        "benchmark_validation_loss": 0.2,
+        "benchmark_validation_metrics": metrics,
+    }
+    path = tmp_path / "benchmark_cv_metrics.csv"
+    write_benchmark_cv_csv(path, [result], metrics, {key: 0.0 for key in metrics})
+    with path.open(newline="", encoding="utf-8") as handle:
+        rows = list(csv.DictReader(handle))
+    assert rows[0]["TP"] == "2"
+    assert rows[0]["FN"] == "0"
+    assert rows[1]["fold"] == "mean"
