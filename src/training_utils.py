@@ -340,10 +340,3 @@ def save_predictions(path: Path, predictions: list[dict]):
         writer.writeheader()
         for sample_id, prediction in enumerate(predictions):
             writer.writerow({"sample_id": sample_id, **prediction})
-
-
-def delete_temporary_checkpoint(best_model_path: Path) -> bool:
-    if best_model_path.exists():
-        best_model_path.unlink()
-        return True
-    return False

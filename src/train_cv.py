@@ -15,11 +15,11 @@ from torch.utils.data import DataLoader
 
 from dataset_utils import SequenceSample, read_samples_from_file
 from data_audit import audit_dataset
+from checkpointing import delete_checkpoint_after_verified_export
 from metrics_utils import format_metrics, json_safe_metrics
 from plotting import save_paper_curves
 from reporting import (
     ensemble_prediction_files,
-    read_prediction_file,
     summarize_metrics,
     write_benchmark_cv_csv,
     write_prediction_file,
@@ -41,7 +41,6 @@ from training_utils import (
     append_train_log,
     evaluate,
     metric_score,
-    delete_temporary_checkpoint,
     resolve_path,
     save_predictions,
     select_device,
@@ -455,14 +454,14 @@ def train_one_fold(
     with metrics_path.open("w", encoding="utf-8") as handle:
         json.dump(json_safe_metrics(fold_payload), handle, indent=2, ensure_ascii=False)
 
-    # Deletion is deliberately last: verify all irreplaceable result files can be read first.
-    read_prediction_file(benchmark_predictions_path)
-    read_prediction_file(independent_predictions_path)
-    with metrics_path.open("r", encoding="utf-8") as handle:
-        json.load(handle)
-    best_model_deleted = delete_temporary_checkpoint(best_model_path)
-    fold_payload["best_model_deleted"] = best_model_deleted
-    fold_payload["best_model_path"] = None if best_model_deleted else str(best_model_path)
+    # Deletion is deliberately last: helper validates all irreplaceable result files first.
+    delete_checkpoint_after_verified_export(
+        best_model_path,
+        [benchmark_predictions_path, independent_predictions_path],
+        metrics_path,
+    )
+    fold_payload["best_model_deleted"] = True
+    fold_payload["best_model_path"] = None
     with metrics_path.open("w", encoding="utf-8") as handle:
         json.dump(json_safe_metrics(fold_payload), handle, indent=2, ensure_ascii=False)
 
@@ -474,8 +473,6 @@ def train_one_fold(
         torch.mps.empty_cache()
 
     print(f"Fold {fold_idx} test_loss={test_loss:.4f} {format_metrics(test_metrics)}")
-    if not best_model_deleted:
-        raise RuntimeError(f"Fold {fold_idx} checkpoint was not deleted: {best_model_path}")
     print(f"Fold {fold_idx} deleted temporary checkpoint after verified result export: {best_model_path}")
     return fold_payload
 

@@ -61,9 +61,9 @@ def test_manifest_matches_all_dataset_files():
 @pytest.mark.skipif(not SOURCE_ROOT.exists(), reason="BiRNA_m6A source tree is not available")
 def test_migrated_rows_exactly_match_birna_m6a_source():
     for _alias, (canonical, source_name, _benchmark_count, _independent_count) in DATASETS.items():
-        assert Counter(read_rows(DATA_ROOT / canonical / "benchmark.csv")) == Counter(
-            read_rows(SOURCE_ROOT / source_name / "train.csv")
+        assert read_rows(DATA_ROOT / canonical / "benchmark.csv") == read_rows(
+            SOURCE_ROOT / source_name / "train.csv"
         )
-        assert Counter(read_rows(DATA_ROOT / canonical / "independent_test.csv")) == Counter(
-            read_rows(SOURCE_ROOT / source_name / "test.csv")
+        assert read_rows(DATA_ROOT / canonical / "independent_test.csv") == read_rows(
+            SOURCE_ROOT / source_name / "test.csv"
         )
