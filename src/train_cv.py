@@ -457,7 +457,10 @@ def train_one_fold(
     # Deletion is deliberately last: helper validates all irreplaceable result files first.
     delete_checkpoint_after_verified_export(
         best_model_path,
-        [benchmark_predictions_path, independent_predictions_path],
+        [
+            (benchmark_predictions_path, len(val_samples)),
+            (independent_predictions_path, len(independent_test_samples)),
+        ],
         metrics_path,
     )
     fold_payload["best_model_deleted"] = True

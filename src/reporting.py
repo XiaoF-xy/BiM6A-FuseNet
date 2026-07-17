@@ -41,6 +41,14 @@ def read_prediction_file(path: Path) -> list[dict]:
             )
     if not rows:
         raise ValueError(f"Prediction file is empty: {path}")
+    for row in rows:
+        if row["label"] not in (0, 1) or row["pred"] not in (0, 1):
+            raise ValueError(f"Prediction file contains non-binary labels: {path}")
+        if not math.isfinite(row["prob"]) or not 0.0 <= row["prob"] <= 1.0:
+            raise ValueError(f"Prediction file contains an invalid probability: {path}")
+        sequence = row["sequence"]
+        if len(sequence) != 41 or sequence[20] != "A" or not set(sequence) <= set("ACGT"):
+            raise ValueError(f"Prediction file contains an invalid 41-nt sequence: {path}")
     ids = [row["sample_id"] for row in rows]
     if len(ids) != len(set(ids)):
         raise ValueError(f"Prediction file contains duplicate sample_id values: {path}")

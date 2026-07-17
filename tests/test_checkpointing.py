@@ -36,7 +36,7 @@ def test_checkpoint_is_deleted_only_after_all_exports_are_readable(tmp_path: Pat
     metrics = tmp_path / "metrics.json"
     metrics.write_text(json.dumps({"ACC": 1.0}), encoding="utf-8")
 
-    delete_checkpoint_after_verified_export(checkpoint, [benchmark, independent], metrics)
+    delete_checkpoint_after_verified_export(checkpoint, [(benchmark, 1), (independent, 1)], metrics)
 
     assert not checkpoint.exists()
 
@@ -50,6 +50,20 @@ def test_checkpoint_is_retained_when_result_validation_fails(tmp_path: Path):
     metrics.write_text("{}", encoding="utf-8")
 
     with pytest.raises((KeyError, ValueError)):
-        delete_checkpoint_after_verified_export(checkpoint, [malformed_predictions], metrics)
+        delete_checkpoint_after_verified_export(checkpoint, [(malformed_predictions, 1)], metrics)
+
+    assert checkpoint.exists()
+
+
+def test_checkpoint_is_retained_when_prediction_export_is_truncated(tmp_path: Path):
+    checkpoint = tmp_path / "best_model.pt"
+    checkpoint.write_bytes(b"temporary checkpoint")
+    predictions = tmp_path / "predictions.csv"
+    write_prediction_file(predictions, valid_prediction_rows())
+    metrics = tmp_path / "metrics.json"
+    metrics.write_text("{}", encoding="utf-8")
+
+    with pytest.raises(ValueError, match="incomplete"):
+        delete_checkpoint_after_verified_export(checkpoint, [(predictions, 2)], metrics)
 
     assert checkpoint.exists()
