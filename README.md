@@ -1,6 +1,11 @@
 # BiM6A-FuseNet
 
-这是可独立复制到服务器运行的 m6A 位点预测项目。当前 `v1_baseline` 与 BiRNA_m6A v9a 保持相同模型结构和训练超参数，并采用与 MKE-ResNet 可比较的严格五折模型选择流程。
+这是可独立复制到服务器运行的 m6A 位点预测项目。`v1_baseline` 与 BiRNA_m6A v9a 保持相同模型结构和训练超参数；`v1b_proj256_concat` 只改变双分支融合头。两个版本都采用与 MKE-ResNet 可比较的严格五折模型选择流程。
+
+## 版本
+
+- `v1_baseline`：原 v9a 结构，BiRNA 特征和 128 维手工特征直接拼接。
+- `v1b_proj256_concat`：BiRNA 分支和手工特征分支分别经过 `Linear → LayerNorm → GELU → Dropout(0.2)` 投影到 256 维，拼接成 512 维后分类。特征提取器和评估协议不变。
 
 ## 数据含义
 
@@ -26,11 +31,17 @@ python train.py --version v1_baseline --dataset H_b --seed 42 --dry_run
 python train.py --version v1_baseline --dataset H_b --seed 42
 ```
 
+运行 v1b 人脑数据集：
+
+```bash
+CUDA_VISIBLE_DEVICES=0 python train.py --version v1b_proj256_concat --dataset H_b --seed 42
+```
+
 五折固定为 `StratifiedKFold(n_splits=5, shuffle=True, random_state=42)`。每折训练 seed 依次为 42–46，按验证 ACC 选择最佳 epoch。独立测试集最终结果是五个折模型正类概率的平均值，不是五次测试指标的平均值。
 
 ## 输出
 
-结果保存在 `outputs/v1_baseline/<dataset>/seed_<seed>/`：
+结果保存在 `outputs/<version>/<dataset>/seed_<seed>/`：
 
 ```text
 benchmark_cv_metrics.csv
