@@ -43,3 +43,15 @@ def test_seed_42_stratified_folds_cover_benchmark_once_without_overlap():
 def test_v1_rejects_a_seed_that_would_change_the_mke_comparison_protocol():
     with pytest.raises(ValueError, match="seed at 42"):
         load_experiment_config("v1_baseline", "H_b", seed=7)
+
+
+def test_v1b_command_enables_only_projected_concat_fusion():
+    config = load_experiment_config("v1b_proj256_concat", "H_b", seed=42)
+    command = build_cv_command(config)
+    joined = " ".join(command)
+
+    assert "--use_projected_concat" in command
+    assert "--use_gated_fusion" not in command
+    assert command[command.index("--folds") + 1] == "5"
+    assert command[command.index("--epochs") + 1] == "20"
+    assert "--selection_metric ACC" in joined

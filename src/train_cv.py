@@ -32,6 +32,7 @@ from model_birna_film import (
     BiRNAFiLMLocalClassifier,
     HandcraftedOnlyClassifier,
 )
+from model_birna_film_proj import BiRNAFiLMProjectedConcatClassifier
 from model_birna_nuc import BiRNANucClassifier, load_birna_tokenizer
 from training_utils import (
     DualViewDataCollator,
@@ -143,6 +144,11 @@ def parse_args():
         "--use_gated_fusion",
         action="store_true",
         help="Fuse BiRNA and handcrafted branches with a learnable vector gate instead of simple concatenation.",
+    )
+    parser.add_argument(
+        "--use_projected_concat",
+        action="store_true",
+        help="Project both branches independently to 256 dimensions before concatenation.",
     )
     parser.add_argument("--gated_fusion_dim", type=int, default=256)
     parser.add_argument("--gated_hidden_dim", type=int, default=128)
@@ -264,7 +270,9 @@ def train_one_fold(
             cnn_kernel_sizes=args.cnn_kernel_sizes,
         )
     elif args.use_film:
-        if args.use_gated_fusion:
+        if args.use_projected_concat:
+            film_model_cls = BiRNAFiLMProjectedConcatClassifier
+        elif args.use_gated_fusion:
             film_model_cls = BiRNAFiLMGatedHandcraftedClassifier
         else:
             film_model_cls = BiRNAFiLMHandcraftedClassifier if args.use_handcrafted_features else BiRNAFiLMLocalClassifier
@@ -519,10 +527,16 @@ def main():
     args.handcrafted_feature_names = parse_feature_names(args.handcrafted_feature_names)
     if args.use_gated_fusion and (not args.use_film or not args.use_handcrafted_features):
         raise ValueError("--use_gated_fusion requires both --use_film and --use_handcrafted_features.")
+    if args.use_projected_concat and (not args.use_film or not args.use_handcrafted_features):
+        raise ValueError("--use_projected_concat requires both --use_film and --use_handcrafted_features.")
+    if args.use_projected_concat and args.use_gated_fusion:
+        raise ValueError("--use_projected_concat cannot be combined with --use_gated_fusion.")
     if args.handcrafted_only:
         args.use_handcrafted_features = True
         if args.use_gated_fusion:
             raise ValueError("--handcrafted_only cannot be combined with --use_gated_fusion.")
+        if args.use_projected_concat:
+            raise ValueError("--handcrafted_only cannot be combined with --use_projected_concat.")
         if args.use_lora:
             raise ValueError("--handcrafted_only cannot be combined with --use_lora.")
         if args.use_bpe_view:
@@ -561,7 +575,8 @@ def main():
             f"cnn_channels={args.handcrafted_cnn_channels}, "
             f"output_dim={args.handcrafted_output_dim}, "
             f"handcrafted_only={args.handcrafted_only}, "
-            f"use_gated_fusion={args.use_gated_fusion}"
+            f"use_gated_fusion={args.use_gated_fusion}, "
+            f"use_projected_concat={args.use_projected_concat}"
         )
         if args.use_gated_fusion:
             print(

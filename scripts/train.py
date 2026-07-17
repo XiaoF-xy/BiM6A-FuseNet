@@ -116,6 +116,8 @@ def build_cv_command(config) -> list[str]:
             "--gated_hidden_dim",
             str(model.gated_hidden_dim),
         ])
+    if model.use_projected_concat:
+        command.append("--use_projected_concat")
     if model.handcrafted_only:
         command.append("--handcrafted_only")
     return command
