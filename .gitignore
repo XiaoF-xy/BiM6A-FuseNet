@@ -1,0 +1,9 @@
+.DS_Store
+__pycache__/
+*.py[cod]
+.pytest_cache/
+.venv*/
+outputs/
+
+# The copied 447 MB weight stays in the portable folder but is not suitable for ordinary Git hosting.
+pretrained/birna-bert-model/pytorch_model.bin

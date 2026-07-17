@@ -1,0 +1,12 @@
+dataset_id,canonical_name,source_name,species,tissue,benchmark_path,independent_path,benchmark_positive,benchmark_negative,benchmark_total,independent_positive,independent_negative,independent_total,sequence_length,validation_status
+H_b,human_brain,Human_Brain,human,brain,human_brain/benchmark.csv,human_brain/independent_test.csv,4605,4605,9210,4604,4604,9208,41,valid
+H_k,human_kidney,Human_Kidney,human,kidney,human_kidney/benchmark.csv,human_kidney/independent_test.csv,4574,4574,9148,4573,4573,9146,41,valid
+H_l,human_liver,Human_Liver,human,liver,human_liver/benchmark.csv,human_liver/independent_test.csv,2634,2634,5268,2634,2634,5268,41,valid
+M_b,mouse_brain,Mouse_brain,mouse,brain,mouse_brain/benchmark.csv,mouse_brain/independent_test.csv,8025,8025,16050,8025,8025,16050,41,valid
+M_h,mouse_heart,Mouse_heart,mouse,heart,mouse_heart/benchmark.csv,mouse_heart/independent_test.csv,2201,2201,4402,2200,2200,4400,41,valid
+M_k,mouse_kidney,Mouse_kidney,mouse,kidney,mouse_kidney/benchmark.csv,mouse_kidney/independent_test.csv,3953,3953,7906,3952,3952,7904,41,valid
+M_l,mouse_liver,Mouse_liver,mouse,liver,mouse_liver/benchmark.csv,mouse_liver/independent_test.csv,4133,4133,8266,4133,4133,8266,41,valid
+M_t,mouse_testis,Mouse_test,mouse,testis,mouse_testis/benchmark.csv,mouse_testis/independent_test.csv,4707,4707,9414,4706,4706,9412,41,valid
+R_b,rat_brain,rat_brain,rat,brain,rat_brain/benchmark.csv,rat_brain/independent_test.csv,2352,2352,4704,2351,2351,4702,41,valid
+R_k,rat_kidney,rat_kidney,rat,kidney,rat_kidney/benchmark.csv,rat_kidney/independent_test.csv,3433,3433,6866,3432,3432,6864,41,valid
+R_l,rat_liver,rat_liver,rat,liver,rat_liver/benchmark.csv,rat_liver/independent_test.csv,1762,1762,3524,1762,1762,3524,41,valid
