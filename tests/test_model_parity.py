@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import hashlib
+from dataclasses import asdict
 from pathlib import Path
 
 from configs.configarg import load_experiment_config
@@ -58,3 +59,22 @@ def test_pretrained_weight_matches_recorded_birna_bert_hash():
     assert sha256(ROOT / "pretrained" / "birna-bert-model" / "pytorch_model.bin") == (
         "4833ca3207d1908a86acffc84d6435379ab65c8da8f1790065c3c683bdacef3b"
     )
+
+
+def test_v1b_changes_only_projected_concat_configuration():
+    v1 = load_experiment_config("v1_baseline", "H_b", seed=42)
+    v1b = load_experiment_config("v1b_proj256_concat", "H_b", seed=42)
+
+    assert v1.model.use_projected_concat is False
+    assert v1b.model.use_projected_concat is True
+    assert v1b.training.folds == v1.training.folds == 5
+    assert v1b.training.epochs == v1.training.epochs == 20
+    assert v1b.training.selection_metric == v1.training.selection_metric == "ACC"
+    assert v1b.training.batch_size == v1.training.batch_size
+    assert v1b.training.lr == v1.training.lr
+    assert v1b.training.weight_decay == v1.training.weight_decay
+    v1_model = asdict(v1.model)
+    v1b_model = asdict(v1b.model)
+    assert v1_model.pop("use_projected_concat") is False
+    assert v1b_model.pop("use_projected_concat") is True
+    assert v1b_model == v1_model

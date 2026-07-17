@@ -29,6 +29,7 @@ DATASET_ALIASES = {
 
 BASE_VERSION_CONFIG_MODULES = {
     "v1_baseline": "experiments.v1_baseline.config_v1",
+    "v1b_proj256_concat": "experiments.v1b_proj256_concat.config_v1b",
 }
 
 VERSION_CONFIG_MODULES = dict(BASE_VERSION_CONFIG_MODULES)
@@ -69,6 +70,7 @@ class ModelConfig:
     handcrafted_cnn_channels: int = 64
     handcrafted_output_dim: int = 128
     use_gated_fusion: bool = False
+    use_projected_concat: bool = False
     gated_fusion_dim: int = 256
     gated_hidden_dim: int = 128
 
