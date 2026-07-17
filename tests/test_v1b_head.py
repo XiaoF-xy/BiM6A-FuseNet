@@ -4,15 +4,20 @@ import sys
 import unittest
 from pathlib import Path
 
-import torch
+try:
+    import torch
+except ImportError:  # The lightweight config-test environment does not include PyTorch.
+    torch = None
 
 
 ROOT = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(ROOT / "src"))
 
-from model_birna_film_proj import ProjectedConcatFusionHead  # noqa: E402
+if torch is not None:
+    from model_birna_film_proj import ProjectedConcatFusionHead  # noqa: E402
 
 
+@unittest.skipIf(torch is None, "PyTorch is required for the fusion-head forward test.")
 class ProjectedConcatFusionHeadTest(unittest.TestCase):
     def test_projection_dimensions_and_forward_shape(self):
         head = ProjectedConcatFusionHead(

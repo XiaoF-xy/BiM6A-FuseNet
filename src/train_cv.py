@@ -501,11 +501,11 @@ def main():
     args.output_dir = resolve_path(args.output_dir)
 
     if args.folds != 5:
-        raise ValueError("BiM6A-FuseNet v1 requires exactly five stratified folds (--folds 5).")
+        raise ValueError("BiM6A-FuseNet v1-family experiments require exactly five stratified folds (--folds 5).")
     if args.selection_metric != "ACC":
-        raise ValueError("BiM6A-FuseNet v1 selects the best epoch by ACC; use --selection_metric ACC.")
+        raise ValueError("BiM6A-FuseNet v1-family experiments select the best epoch by ACC; use --selection_metric ACC.")
     if args.seed != 42:
-        raise ValueError("BiM6A-FuseNet v1 requires --seed 42; fold training seeds are fixed at 42–46.")
+        raise ValueError("BiM6A-FuseNet v1-family experiments require --seed 42; fold training seeds are fixed at 42–46.")
     if args.epochs <= 0:
         raise ValueError("--epochs must be a positive integer.")
     if args.batch_size <= 0:

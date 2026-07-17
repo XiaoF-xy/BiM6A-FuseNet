@@ -125,7 +125,7 @@ def load_experiment_config(version_name: str, dataset_name: str = "Human_Brain",
         supported = ", ".join(sorted(VERSION_CONFIG_MODULES))
         raise ValueError(f"Unknown version: {version_name}. Supported versions: {supported}")
     if seed != 42:
-        raise ValueError("v1_baseline fixes the CV split seed at 42 and fold training seeds at 42–46.")
+        raise ValueError("v1-family experiments fix the CV split seed at 42 and fold training seeds at 42–46.")
 
     dataset = canonical_dataset_name(dataset_name)
     module = importlib.import_module(VERSION_CONFIG_MODULES[version_name])
