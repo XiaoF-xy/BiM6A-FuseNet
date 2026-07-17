@@ -282,7 +282,7 @@ def metric_score(metrics: dict[str, float], selection_metric: str = "ACC") -> fl
 
 def write_train_log_header(path: Path):
     with path.open("w", newline="", encoding="utf-8") as handle:
-        writer = csv.writer(handle)
+        writer = csv.writer(handle, lineterminator="\n")
         writer.writerow([
             "epoch",
             "train_loss",
@@ -307,7 +307,7 @@ def write_train_log_header(path: Path):
 
 def append_train_log(path: Path, row: dict):
     with path.open("a", newline="", encoding="utf-8") as handle:
-        writer = csv.DictWriter(handle, fieldnames=[
+        writer = csv.DictWriter(handle, lineterminator="\n", fieldnames=[
             "epoch",
             "train_loss",
             "val_loss",
@@ -332,7 +332,11 @@ def append_train_log(path: Path, row: dict):
 
 def save_predictions(path: Path, predictions: list[dict]):
     with path.open("w", newline="", encoding="utf-8") as handle:
-        writer = csv.DictWriter(handle, fieldnames=["sample_id", "sequence", "label", "prob", "pred"])
+        writer = csv.DictWriter(
+            handle,
+            fieldnames=["sample_id", "sequence", "label", "prob", "pred"],
+            lineterminator="\n",
+        )
         writer.writeheader()
         for sample_id, prediction in enumerate(predictions):
             writer.writerow({"sample_id": sample_id, **prediction})

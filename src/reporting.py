@@ -49,7 +49,7 @@ def read_prediction_file(path: Path) -> list[dict]:
 def write_prediction_file(path: Path, rows: list[dict]) -> None:
     Path(path).parent.mkdir(parents=True, exist_ok=True)
     with Path(path).open("w", newline="", encoding="utf-8") as handle:
-        writer = csv.DictWriter(handle, fieldnames=PREDICTION_FIELDS)
+        writer = csv.DictWriter(handle, fieldnames=PREDICTION_FIELDS, lineterminator="\n")
         writer.writeheader()
         writer.writerows(rows)
 

@@ -67,7 +67,7 @@ def read_and_validate(path: Path) -> list[dict[str, object]]:
 def write_rows(path: Path, rows: list[dict[str, object]]) -> None:
     path.parent.mkdir(parents=True, exist_ok=True)
     with path.open("w", newline="", encoding="utf-8") as handle:
-        writer = csv.DictWriter(handle, fieldnames=["sequence", "label"])
+        writer = csv.DictWriter(handle, fieldnames=["sequence", "label"], lineterminator="\n")
         writer.writeheader()
         writer.writerows(rows)
 
@@ -109,7 +109,7 @@ def migrate(source_root: Path, destination_root: Path) -> None:
 
     destination_root.mkdir(parents=True, exist_ok=True)
     with (destination_root / "manifest.csv").open("w", newline="", encoding="utf-8") as handle:
-        writer = csv.DictWriter(handle, fieldnames=MANIFEST_FIELDS)
+        writer = csv.DictWriter(handle, fieldnames=MANIFEST_FIELDS, lineterminator="\n")
         writer.writeheader()
         writer.writerows(manifest)
 

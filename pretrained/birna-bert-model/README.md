@@ -28,7 +28,7 @@ seq_embed = mysterybert(**tokenizer("AGCTACGTACGT", return_tensors="pt"))
 print(seq_embed.logits.shape) # CLS + 4 BPE token embeddings + SEP
 
 # To get nucleotide embeddings
-char_embed = mysterybert(**tokenizer("A G C T A C G T A C G T", return_tensors="pt")) 
+char_embed = mysterybert(**tokenizer("A G C T A C G T A C G T", return_tensors="pt"))
 print(char_embed.logits.shape) # CLS + 12 nucleotide token embeddings + SEP
 ```
 
@@ -40,5 +40,3 @@ config.alibi_starting_size = 2048 # maximum sequence length updated to 2048 from
 
 mysterybert = AutoModelForMaskedLM.from_pretrained("buetnlpbio/birna-bert",config=config,trust_remote_code=True)
 ```
-
-

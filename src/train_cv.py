@@ -487,7 +487,7 @@ def summarize_folds(fold_results: list[dict]) -> dict:
 def save_cv_summary_csv(path: Path, fold_results: list[dict], summary: dict):
     with path.open("w", newline="", encoding="utf-8") as handle:
         fieldnames = ["fold", "best_epoch", "best_score", "benchmark_validation_loss"] + METRIC_KEYS
-        writer = csv.DictWriter(handle, fieldnames=fieldnames)
+        writer = csv.DictWriter(handle, fieldnames=fieldnames, lineterminator="\n")
         writer.writeheader()
         for result in fold_results:
             row = {
@@ -515,6 +515,8 @@ def main():
 
     if args.folds != 5:
         raise ValueError("BiM6A-FuseNet v1 requires exactly five stratified folds (--folds 5).")
+    if args.selection_metric != "ACC":
+        raise ValueError("BiM6A-FuseNet v1 selects the best epoch by ACC; use --selection_metric ACC.")
     if args.epochs <= 0:
         raise ValueError("--epochs must be a positive integer.")
     if args.batch_size <= 0:
