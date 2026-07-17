@@ -112,6 +112,7 @@ For each fold:
 3. Select and save the epoch with the highest validation ACC, matching the MKE public source behavior.
 4. Save validation labels, probabilities, predictions, and metrics for the selected checkpoint.
 5. Reload the selected checkpoint and predict `independent_test.csv` exactly once.
+6. After benchmark and independent-test predictions are durably saved and validated, delete the fold checkpoint, release the model object, and empty the CUDA cache before starting the next fold.
 
 Per-fold seeds are 42, 43, 44, 45, and 46 for folds 1-5.
 
@@ -157,8 +158,7 @@ outputs/v1_baseline/<dataset>/seed_42/
 │   ├── train_log.csv
 │   ├── benchmark_predictions.csv
 │   ├── independent_predictions.csv
-│   ├── metrics.json
-│   └── best_model.pt
+│   └── metrics.json
 ├── fold_02/
 ├── fold_03/
 ├── fold_04/
@@ -174,6 +174,8 @@ outputs/v1_baseline/<dataset>/seed_42/
 
 Training stops with a clear error when required data, tokenizer files, or pretrained weights are missing; when a dataset violates its manifest; when fold prediction rows cannot be aligned; or when fewer than five valid fold predictions are available for the ensemble. Partial ensembles are not silently accepted.
 
+Fold checkpoints are temporary. A checkpoint is deleted only after its benchmark predictions, independent-test predictions, selected-epoch metadata, and metrics have been written and re-read successfully. The pretrained BiRNA-BERT assets are never deleted. If prediction export fails, the checkpoint is retained to support recovery.
+
 ## Verification
 
 Verification includes:
@@ -183,7 +185,8 @@ Verification includes:
 3. Unit-test metrics, specificity, curve generation, and ensemble alignment.
 4. Run a small end-to-end smoke test.
 5. Run one full tissue dataset and verify that all five fold artifacts and final ensemble outputs are present.
-6. Confirm the copied project resolves no runtime imports or files from the sibling BiRNA_m6A directory.
+6. Confirm all five temporary fold checkpoints are deleted after successful prediction export while all prediction and plotting inputs remain available.
+7. Confirm the copied project resolves no runtime imports or files from the sibling BiRNA_m6A directory.
 
 ## Server Portability
 
