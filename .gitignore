@@ -4,6 +4,7 @@ __pycache__/
 .pytest_cache/
 .venv*/
 outputs/
+.worktrees/
 
 # The copied 447 MB weight stays in the portable folder but is not suitable for ordinary Git hosting.
 # Deploy with rsync/scp as documented in README.md; a plain git clone does not contain this file.
