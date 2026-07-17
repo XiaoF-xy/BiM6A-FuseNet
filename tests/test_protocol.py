@@ -23,6 +23,7 @@ def test_v1_command_is_strict_five_fold_and_has_no_checkpoint_retention_switch()
     assert "--selection_metric ACC" in joined
     assert "--eval_protocol" not in command
     assert "--keep_best_model" not in command
+    assert "--use_projected_concat" not in command
     assert config.data.data_dir / "benchmark.csv" == ROOT / "data/m6a_41nt/human_brain/benchmark.csv"
 
 
