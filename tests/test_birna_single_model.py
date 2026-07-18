@@ -11,6 +11,7 @@ from src.model_birna_single import (
     BiRNASingleBranchClassifier,
     masked_mean_nucleotide_embeddings,
     nucleotide_content_mask,
+    validate_lora_target_modules,
 )
 
 
@@ -19,13 +20,40 @@ class FakeBackbone(nn.Module):
         super().__init__()
         self.config = SimpleNamespace(hidden_size=768)
         self.base_weight = nn.Parameter(torch.ones(1))
+        self.Wqkv = nn.Linear(1, 3)
 
     def forward(self, input_ids, attention_mask=None, token_type_ids=None):
         embeddings = input_ids.float().unsqueeze(-1).repeat(1, 1, 768)
         return SimpleNamespace(logits=embeddings * self.base_weight)
 
 
+class FakeTargetBackbone(nn.Module):
+    def __init__(self):
+        super().__init__()
+        self.Wqkv = nn.Linear(4, 12)
+        self.attention = nn.Module()
+        self.attention.output = nn.Module()
+        self.attention.output.dense = nn.Linear(4, 4)
+        self.gated_layers = nn.Linear(4, 8)
+        self.wo = nn.Linear(8, 4)
+
+
 class BiRNASingleModelTests(unittest.TestCase):
+    def test_lora_target_validation_accepts_every_configured_suffix(self):
+        matches = validate_lora_target_modules(
+            FakeTargetBackbone(),
+            ["Wqkv", "attention.output.dense", "gated_layers", "wo"],
+        )
+
+        self.assertEqual(
+            set(matches),
+            {"Wqkv", "attention.output.dense", "gated_layers", "wo"},
+        )
+
+    def test_lora_target_validation_rejects_an_unmatched_suffix(self):
+        with self.assertRaisesRegex(ValueError, "missing_target"):
+            validate_lora_target_modules(FakeTargetBackbone(), ["Wqkv", "missing_target"])
+
     def test_content_mask_excludes_cls_sep_and_padding(self):
         attention_mask = torch.tensor(
             [

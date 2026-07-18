@@ -15,6 +15,28 @@ EXPECTED_NUCLEOTIDE_COUNT = 41
 EXPECTED_HIDDEN_SIZE = 768
 
 
+def validate_lora_target_modules(
+    model: nn.Module,
+    target_modules: list[str],
+) -> dict[str, list[str]]:
+    """Require every configured suffix to match at least one linear backbone module."""
+    linear_module_names = [
+        name for name, module in model.named_modules() if name and isinstance(module, nn.Linear)
+    ]
+    matches = {
+        target: [name for name in linear_module_names if name.endswith(target)]
+        for target in target_modules
+    }
+    missing = [target for target, names in matches.items() if not names]
+    if missing:
+        available = ", ".join(linear_module_names[:20]) or "<none>"
+        raise ValueError(
+            "LoRA target modules did not match a linear BiRNA-BERT module: "
+            f"{missing}. Available linear modules include: {available}"
+        )
+    return matches
+
+
 def nucleotide_content_mask(attention_mask: torch.Tensor) -> torch.Tensor:
     """Return a mask containing only NUC tokens, excluding CLS, SEP, and padding."""
     if attention_mask.ndim != 2:
@@ -84,9 +106,11 @@ class BiRNASingleBranchClassifier(nn.Module):
             )
 
         if self.use_lora:
+            targets = lora_target_modules or ["Wqkv"]
+            validate_lora_target_modules(self.birna_model, targets)
             self.birna_model = apply_lora_to_birna(
                 birna_model=self.birna_model,
-                target_modules=lora_target_modules or ["Wqkv"],
+                target_modules=targets,
                 r=lora_r,
                 alpha=lora_alpha,
                 dropout=lora_dropout,

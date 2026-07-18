@@ -17,6 +17,8 @@ REQUIRED = [
     ROOT / "data" / "m6a_41nt" / "manifest.csv",
     ROOT / "experiments" / "v0a_birna_nuc_lora" / "config_v0a.py",
     ROOT / "experiments" / "v0b_birna_nuc_fullft" / "config_v0b.py",
+    ROOT / "experiments" / "v0c_birna_lora_full_attention" / "config_v0c.py",
+    ROOT / "experiments" / "v0d_birna_lora_attention_ffn" / "config_v0d.py",
     ROOT / "experiments" / "v1_baseline" / "config_v1.py",
     ROOT / "experiments" / "mke_variants_common.py",
     ROOT / "experiments" / "v2a_mke_res_eca_native" / "config_v2a.py",

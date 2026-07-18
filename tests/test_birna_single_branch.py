@@ -1,5 +1,7 @@
 from __future__ import annotations
 
+from dataclasses import asdict
+
 import pytest
 
 from configs.configarg import load_experiment_config
@@ -43,6 +45,38 @@ def test_v0b_is_pure_nuc_full_finetuning_with_warmup():
     assert command[command.index("--warmup_ratio") + 1] == "0.1"
     assert "--freeze_backbone" not in command
     assert "--use_lora" not in command
+
+
+@pytest.mark.parametrize(
+    ("version", "expected_targets"),
+    [
+        ("v0c_birna_lora_full_attention", ["Wqkv", "attention.output.dense"]),
+        (
+            "v0d_birna_lora_attention_ffn",
+            ["Wqkv", "attention.output.dense", "gated_layers", "wo"],
+        ),
+    ],
+)
+def test_lora_target_expansion_versions_only_change_target_coverage(
+    version,
+    expected_targets,
+):
+    baseline = load_experiment_config("v0a_birna_nuc_lora", "H_b", seed=42)
+    candidate = load_experiment_config(version, "H_b", seed=42)
+    command = build_cv_command(candidate)
+
+    baseline_model = asdict(baseline.model)
+    candidate_model = asdict(candidate.model)
+    assert baseline_model.pop("lora_target_modules") == ["Wqkv"]
+    assert candidate_model.pop("lora_target_modules") == expected_targets
+    assert candidate_model == baseline_model
+
+    baseline_training = asdict(baseline.training)
+    candidate_training = asdict(candidate.training)
+    baseline_training.pop("output_dir")
+    candidate_training.pop("output_dir")
+    assert candidate_training == baseline_training
+    assert command[command.index("--lora_target_modules") + 1] == ",".join(expected_targets)
 
 
 @pytest.mark.parametrize(

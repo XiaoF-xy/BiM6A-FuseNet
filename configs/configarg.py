@@ -30,6 +30,12 @@ DATASET_ALIASES = {
 BASE_VERSION_CONFIG_MODULES = {
     "v0a_birna_nuc_lora": "experiments.v0a_birna_nuc_lora.config_v0a",
     "v0b_birna_nuc_fullft": "experiments.v0b_birna_nuc_fullft.config_v0b",
+    "v0c_birna_lora_full_attention": (
+        "experiments.v0c_birna_lora_full_attention.config_v0c"
+    ),
+    "v0d_birna_lora_attention_ffn": (
+        "experiments.v0d_birna_lora_attention_ffn.config_v0d"
+    ),
     "v1_baseline": "experiments.v1_baseline.config_v1",
     "v1b_proj256_concat": "experiments.v1b_proj256_concat.config_v1b",
     "v2a_mke_res_eca_native": "experiments.v2a_mke_res_eca_native.config_v2a",
