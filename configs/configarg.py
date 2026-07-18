@@ -28,6 +28,8 @@ DATASET_ALIASES = {
 
 
 BASE_VERSION_CONFIG_MODULES = {
+    "v0a_birna_nuc_lora": "experiments.v0a_birna_nuc_lora.config_v0a",
+    "v0b_birna_nuc_fullft": "experiments.v0b_birna_nuc_fullft.config_v0b",
     "v1_baseline": "experiments.v1_baseline.config_v1",
     "v1b_proj256_concat": "experiments.v1b_proj256_concat.config_v1b",
     "v2a_mke_res_eca_native": "experiments.v2a_mke_res_eca_native.config_v2a",
@@ -67,6 +69,7 @@ class ModelConfig:
     film_nuc_pooling: str = "center_mean"
     cnn_kernel_sizes: list[int] = field(default_factory=lambda: [3, 5, 7])
     use_lora: bool = False
+    use_birna_single_branch: bool = False
     lora_r: int = 8
     lora_alpha: int = 32
     lora_dropout: float = 0.05
@@ -109,6 +112,7 @@ class TrainConfig:
     scheduler_patience: int | None = None
     scheduler_factor: float = 0.1
     early_stopping_patience: int | None = None
+    warmup_ratio: float | None = None
 
 
 @dataclass

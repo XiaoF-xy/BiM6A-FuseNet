@@ -35,8 +35,14 @@ from model_birna_film import (
 from model_birna_film_proj import BiRNAFiLMProjectedConcatClassifier
 from model_birna_mke import BiRNAFiLMMKEClassifier
 from model_birna_nuc import BiRNANucClassifier, load_birna_tokenizer
+from model_birna_single import BiRNASingleBranchClassifier
 from model_mke_official import OfficialMKEClassifier
-from training_control import EarlyStopping, build_optimizer, build_plateau_scheduler
+from training_control import (
+    EarlyStopping,
+    build_constant_warmup_scheduler,
+    build_optimizer,
+    build_plateau_scheduler,
+)
 from training_utils import (
     DualViewDataCollator,
     RNANucDataset,
@@ -97,6 +103,12 @@ def parse_args():
         default=None,
         help="Stop after this many epochs without validation selection-metric improvement; omitted means disabled.",
     )
+    parser.add_argument(
+        "--warmup_ratio",
+        type=float,
+        default=None,
+        help="Optional fraction of optimizer steps used for linear warmup before a constant learning rate.",
+    )
     parser.add_argument("--seed", type=int, default=42)
     parser.add_argument("--max_length", type=int, default=64)
     parser.add_argument(
@@ -107,6 +119,11 @@ def parse_args():
         help="Metric used to select the best epoch/checkpoint. Default follows DFM-style ACC selection.",
     )
     parser.add_argument("--freeze_backbone", action="store_true")
+    parser.add_argument(
+        "--use_birna_single_branch",
+        action="store_true",
+        help="Use the pure BiRNA-BERT NUC masked-mean classifier without FiLM or handcrafted features.",
+    )
     parser.add_argument(
         "--disable_center_pooling",
         action="store_true",
@@ -203,6 +220,29 @@ def parse_args():
     parser.add_argument("--gated_fusion_dim", type=int, default=256)
     parser.add_argument("--gated_hidden_dim", type=int, default=128)
     return parser.parse_args()
+
+
+def validate_single_branch_options(args) -> None:
+    if not args.use_birna_single_branch:
+        return
+    incompatible = {
+        "--use_film": args.use_film,
+        "--use_bpe_view": args.use_bpe_view,
+        "--use_handcrafted_features": args.use_handcrafted_features,
+        "--handcrafted_only": args.handcrafted_only,
+        "--use_mke_handcrafted": args.use_mke_handcrafted,
+        "--use_official_mke_handcrafted": args.use_official_mke_handcrafted,
+        "--use_projected_concat": args.use_projected_concat,
+        "--use_gated_fusion": args.use_gated_fusion,
+    }
+    enabled = [name for name, is_enabled in incompatible.items() if is_enabled]
+    if enabled:
+        raise ValueError(
+            "--use_birna_single_branch accepts pure NUC inputs only and cannot be combined with: "
+            + ", ".join(enabled)
+        )
+    if not args.disable_center_pooling:
+        raise ValueError("--use_birna_single_branch requires --disable_center_pooling for masked mean pooling.")
 
 
 def parse_cnn_kernel_sizes(value: str) -> list[int]:
@@ -321,6 +361,8 @@ def train_one_fold(
         handcrafted_input_channels = handcrafted_channel_count(args.handcrafted_feature_names)
     if args.use_official_mke_handcrafted:
         model = OfficialMKEClassifier(sequence_length=41)
+    elif args.use_birna_single_branch:
+        model = BiRNASingleBranchClassifier(**common_model_kwargs)
     elif args.handcrafted_only:
         model = HandcraftedOnlyClassifier(
             handcrafted_input_channels=handcrafted_input_channels,
@@ -433,6 +475,11 @@ def train_one_fold(
         handcrafted_feature_names=args.handcrafted_feature_names,
         use_official_mke_handcrafted=args.use_official_mke_handcrafted,
     )
+    batch_scheduler = build_constant_warmup_scheduler(
+        optimizer,
+        total_steps=len(train_loader) * args.epochs,
+        warmup_ratio=args.warmup_ratio,
+    )
 
     best_score = -math.inf
     best_epoch = None
@@ -446,6 +493,7 @@ def train_one_fold(
             device=device,
             epoch=epoch,
             freeze_backbone=args.freeze_backbone,
+            batch_scheduler=batch_scheduler,
         )
         val_loss, val_metrics = evaluate(
             model=model,
@@ -572,6 +620,8 @@ def train_one_fold(
     del checkpoint, optimizer, criterion, train_loader, val_loader, test_loader, model
     if scheduler is not None:
         del scheduler
+    if batch_scheduler is not None:
+        del batch_scheduler
     gc.collect()
     if torch.cuda.is_available():
         torch.cuda.empty_cache()
@@ -613,6 +663,10 @@ def main():
         raise ValueError("--scheduler_factor must be between 0 and 1.")
     if args.early_stopping_patience is not None and args.early_stopping_patience <= 0:
         raise ValueError("--early_stopping_patience must be positive when provided.")
+    if args.warmup_ratio is not None and not 0.0 <= args.warmup_ratio < 1.0:
+        raise ValueError("--warmup_ratio must be in [0, 1) when provided.")
+    if args.warmup_ratio is not None and args.scheduler_patience is not None:
+        raise ValueError("--warmup_ratio cannot be combined with --scheduler_patience.")
     if args.max_length < 43:
         raise ValueError("--max_length must be at least 43 for 41 NUC tokens plus CLS/SEP.")
     if args.local_window_radius < 0:
@@ -625,6 +679,7 @@ def main():
         raise ValueError("--gated_fusion_dim must be a positive integer.")
     if args.gated_hidden_dim <= 0:
         raise ValueError("--gated_hidden_dim must be a positive integer.")
+    validate_single_branch_options(args)
     if args.use_official_mke_handcrafted:
         args.handcrafted_feature_names = [
             item.strip().lower()
@@ -708,8 +763,10 @@ def main():
     print(f"scheduler_patience: {args.scheduler_patience}")
     print(f"scheduler_factor: {args.scheduler_factor}")
     print(f"early_stopping_patience: {args.early_stopping_patience}")
+    print(f"warmup_ratio: {args.warmup_ratio}")
     print(f"folds: {args.folds}")
     print(f"freeze_backbone: {args.freeze_backbone}")
+    print(f"use_birna_single_branch: {args.use_birna_single_branch}")
     print(f"use_center_pooling: {not args.disable_center_pooling}")
     print(f"use_bpe_view: {args.use_bpe_view}")
     print(f"use_film: {args.use_film}")

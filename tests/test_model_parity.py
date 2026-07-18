@@ -65,6 +65,9 @@ def test_pretrained_weight_matches_recorded_birna_bert_hash():
 def test_portable_check_requires_all_mke_variant_entrypoints():
     required = {path.relative_to(ROOT).as_posix() for path in REQUIRED}
     assert {
+        "src/model_birna_single.py",
+        "experiments/v0a_birna_nuc_lora/config_v0a.py",
+        "experiments/v0b_birna_nuc_fullft/config_v0b.py",
         "src/model_birna_mke.py",
         "src/model_mke_handcrafted.py",
         "experiments/mke_variants_common.py",

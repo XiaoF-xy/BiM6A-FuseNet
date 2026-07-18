@@ -79,6 +79,8 @@ def build_cv_command(config) -> list[str]:
         ])
     if training.early_stopping_patience is not None:
         command.extend(["--early_stopping_patience", str(training.early_stopping_patience)])
+    if training.warmup_ratio is not None:
+        command.extend(["--warmup_ratio", str(training.warmup_ratio)])
     if model.freeze_backbone:
         command.append("--freeze_backbone")
     if not model.use_center_pooling:
@@ -108,6 +110,12 @@ def build_cv_command(config) -> list[str]:
             str(model.lora_dropout),
             "--lora_target_modules",
             ",".join(model.lora_target_modules),
+        ])
+    if model.use_birna_single_branch:
+        command.extend([
+            "--use_birna_single_branch",
+            "--model_label",
+            config.experiment.plot_label,
         ])
     if model.use_official_mke_handcrafted:
         command.extend([

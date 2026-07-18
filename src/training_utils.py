@@ -220,7 +220,16 @@ def move_batch_to_device(batch: dict, device: torch.device) -> tuple[dict, torch
     return model_inputs, labels, sequences
 
 
-def train_one_epoch(model, loader, optimizer, criterion, device, epoch: int, freeze_backbone: bool) -> float:
+def train_one_epoch(
+    model,
+    loader,
+    optimizer,
+    criterion,
+    device,
+    epoch: int,
+    freeze_backbone: bool,
+    batch_scheduler=None,
+) -> float:
     model.train()
     if freeze_backbone and not getattr(model, "use_lora", False) and hasattr(model, "birna_model"):
         model.birna_model.eval()
@@ -235,6 +244,8 @@ def train_one_epoch(model, loader, optimizer, criterion, device, epoch: int, fre
         loss = criterion(logits, labels)
         loss.backward()
         optimizer.step()
+        if batch_scheduler is not None:
+            batch_scheduler.step()
 
         batch_size = labels.size(0)
         total_loss += loss.item() * batch_size

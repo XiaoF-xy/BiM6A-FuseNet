@@ -4,6 +4,8 @@
 
 ## 版本
 
+- `v0a_birna_nuc_lora`：纯 BiRNA-BERT NUC 单分支；masked mean pooling，Wqkv LoRA，不含 FiLM 和手工特征。
+- `v0b_birna_nuc_fullft`：与 v0a 使用相同的单分支分类头，完整微调 BiRNA-BERT，并使用 10% warmup 后恒定学习率。
 - `v1_baseline`：原 v9a 结构，BiRNA 特征和 128 维手工特征直接拼接。
 - `v1b_proj256_concat`：BiRNA 分支和手工特征分支分别经过 `Linear → LayerNorm → GELU → Dropout(0.2)` 投影到 256 维，拼接成 512 维后分类。特征提取器和评估协议不变。
 - `v2a_mke_res_eca_native`：四路 ResNet-ECA 手工分支，使用非对称 `1536+128` 融合。
@@ -56,6 +58,24 @@ python train.py --version v3b_full_mke_eca_proj256 --dataset H_b --seed 42 --dry
 ```bash
 CUDA_VISIBLE_DEVICES=0 python train.py --version v2c_mke_handcrafted_only_official4c --dataset H_b --seed 42
 ```
+
+同时运行三个组织的纯 BiRNA-BERT LoRA 单分支：
+
+```bash
+CUDA_VISIBLE_DEVICES=0 python train.py --version v0a_birna_nuc_lora --dataset H_b --seed 42
+CUDA_VISIBLE_DEVICES=1 python train.py --version v0a_birna_nuc_lora --dataset H_k --seed 42
+CUDA_VISIBLE_DEVICES=2 python train.py --version v0a_birna_nuc_lora --dataset H_l --seed 42
+```
+
+完整微调版本使用：
+
+```bash
+CUDA_VISIBLE_DEVICES=0 python train.py --version v0b_birna_nuc_fullft --dataset H_b --seed 42
+CUDA_VISIBLE_DEVICES=1 python train.py --version v0b_birna_nuc_fullft --dataset H_k --seed 42
+CUDA_VISIBLE_DEVICES=2 python train.py --version v0b_birna_nuc_fullft --dataset H_l --seed 42
+```
+
+v0b 会训练完整 BiRNA-BERT，显存占用明显高于 v0a；发生 OOM 时应显式调整实验配置并记录新版本，程序不会自动静默减小 batch size。
 
 v2c 不加载 tokenizer 或 BiRNA-BERT 权重。它使用 batch size 64、Adam、初始学习率 `1e-3`、weight decay `1e-5`、最多 100 轮、验证损失调度耐心 10 和验证 ACC 早停耐心 20。模型输出两个 logits，因此采用与公开源码接口一致的交叉熵；论文方法部分写作 BCE，这一出处差异记录在 `docs/superpowers/specs/2026-07-18-v2c-official-handcrafted-design.md`。
 
