@@ -30,6 +30,10 @@ DATASET_ALIASES = {
 BASE_VERSION_CONFIG_MODULES = {
     "v1_baseline": "experiments.v1_baseline.config_v1",
     "v1b_proj256_concat": "experiments.v1b_proj256_concat.config_v1b",
+    "v2a_mke_res_eca_native": "experiments.v2a_mke_res_eca_native.config_v2a",
+    "v2b_mke_res_eca_proj256": "experiments.v2b_mke_res_eca_proj256.config_v2b",
+    "v3a_full_mke_eca_native": "experiments.v3a_full_mke_eca_native.config_v3a",
+    "v3b_full_mke_eca_proj256": "experiments.v3b_full_mke_eca_proj256.config_v3b",
 }
 
 VERSION_CONFIG_MODULES = dict(BASE_VERSION_CONFIG_MODULES)
@@ -71,6 +75,9 @@ class ModelConfig:
     handcrafted_output_dim: int = 128
     use_gated_fusion: bool = False
     use_projected_concat: bool = False
+    use_mke_handcrafted: bool = False
+    use_full_mke_eca: bool = False
+    fusion_dim_policy: str = "native"
     gated_fusion_dim: int = 256
     gated_hidden_dim: int = 128
 
@@ -100,6 +107,7 @@ class TrainConfig:
 class ExperimentConfig:
     version_name: str = "v1_baseline"
     description: str = "BiRNA-BERT NUC frozen baseline"
+    plot_label: str = "BiM6A-FuseNet-v1"
 
 
 @dataclass

@@ -16,6 +16,13 @@ REQUIRED = [
     ROOT / "pretrained" / "birna-bert-model" / "tokenizer.json",
     ROOT / "data" / "m6a_41nt" / "manifest.csv",
     ROOT / "experiments" / "v1_baseline" / "config_v1.py",
+    ROOT / "experiments" / "mke_variants_common.py",
+    ROOT / "experiments" / "v2a_mke_res_eca_native" / "config_v2a.py",
+    ROOT / "experiments" / "v2b_mke_res_eca_proj256" / "config_v2b.py",
+    ROOT / "experiments" / "v3a_full_mke_eca_native" / "config_v3a.py",
+    ROOT / "experiments" / "v3b_full_mke_eca_proj256" / "config_v3b.py",
+    ROOT / "src" / "model_birna_mke.py",
+    ROOT / "src" / "model_mke_handcrafted.py",
     ROOT / "src" / "train_cv.py",
     ROOT / "train.py",
 ]

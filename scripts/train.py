@@ -118,6 +118,16 @@ def build_cv_command(config) -> list[str]:
         ])
     if model.use_projected_concat:
         command.append("--use_projected_concat")
+    if model.use_mke_handcrafted:
+        command.extend([
+            "--use_mke_handcrafted",
+            "--fusion_dim_policy",
+            model.fusion_dim_policy,
+            "--model_label",
+            config.experiment.plot_label,
+        ])
+        if model.use_full_mke_eca:
+            command.append("--use_full_mke_eca")
     if model.handcrafted_only:
         command.append("--handcrafted_only")
     return command

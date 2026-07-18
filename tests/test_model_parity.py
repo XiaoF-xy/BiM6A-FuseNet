@@ -5,6 +5,7 @@ from dataclasses import asdict
 from pathlib import Path
 
 from configs.configarg import load_experiment_config
+from scripts.verify_portable import REQUIRED
 
 
 ROOT = Path(__file__).resolve().parents[1]
@@ -59,6 +60,19 @@ def test_pretrained_weight_matches_recorded_birna_bert_hash():
     assert sha256(ROOT / "pretrained" / "birna-bert-model" / "pytorch_model.bin") == (
         "4833ca3207d1908a86acffc84d6435379ab65c8da8f1790065c3c683bdacef3b"
     )
+
+
+def test_portable_check_requires_all_mke_variant_entrypoints():
+    required = {path.relative_to(ROOT).as_posix() for path in REQUIRED}
+    assert {
+        "src/model_birna_mke.py",
+        "src/model_mke_handcrafted.py",
+        "experiments/mke_variants_common.py",
+        "experiments/v2a_mke_res_eca_native/config_v2a.py",
+        "experiments/v2b_mke_res_eca_proj256/config_v2b.py",
+        "experiments/v3a_full_mke_eca_native/config_v3a.py",
+        "experiments/v3b_full_mke_eca_proj256/config_v3b.py",
+    } <= required
 
 
 def test_v1b_changes_only_projected_concat_configuration():

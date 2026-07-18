@@ -1,11 +1,15 @@
 # BiM6A-FuseNet
 
-这是可独立复制到服务器运行的 m6A 位点预测项目。`v1_baseline` 与 BiRNA_m6A v9a 保持相同模型结构和训练超参数；`v1b_proj256_concat` 只改变双分支融合头。两个版本都采用与 MKE-ResNet 可比较的严格五折模型选择流程。
+这是可独立复制到服务器运行的 m6A 位点预测项目。所有版本都采用与 MKE-ResNet 可比较的严格五折模型选择流程，并在固定独立测试集上进行五模型 soft voting。
 
 ## 版本
 
 - `v1_baseline`：原 v9a 结构，BiRNA 特征和 128 维手工特征直接拼接。
 - `v1b_proj256_concat`：BiRNA 分支和手工特征分支分别经过 `Linear → LayerNorm → GELU → Dropout(0.2)` 投影到 256 维，拼接成 512 维后分类。特征提取器和评估协议不变。
+- `v2a_mke_res_eca_native`：四路 ResNet-ECA 手工分支，使用非对称 `1536+128` 融合。
+- `v2b_mke_res_eca_proj256`：与 v2a 相同的手工分支，两条分支分别投影到 256 维。
+- `v3a_full_mke_eca_native`：在 v2a 的融合后特征图上增加完整 MKE-ECA。
+- `v3b_full_mke_eca_proj256`：在 v2b 的融合后特征图上增加完整 MKE-ECA，保留双分支 256 维对齐。
 
 ## 数据含义
 
@@ -35,6 +39,15 @@ python train.py --version v1_baseline --dataset H_b --seed 42
 
 ```bash
 CUDA_VISIBLE_DEVICES=0 python train.py --version v1b_proj256_concat --dataset H_b --seed 42
+```
+
+检查四个 MKE 版本命令：
+
+```bash
+python train.py --version v2a_mke_res_eca_native --dataset H_b --seed 42 --dry_run
+python train.py --version v2b_mke_res_eca_proj256 --dataset H_b --seed 42 --dry_run
+python train.py --version v3a_full_mke_eca_native --dataset H_b --seed 42 --dry_run
+python train.py --version v3b_full_mke_eca_proj256 --dataset H_b --seed 42 --dry_run
 ```
 
 五折固定为 `StratifiedKFold(n_splits=5, shuffle=True, random_state=42)`。每折训练 seed 依次为 42–46，按验证 ACC 选择最佳 epoch。独立测试集最终结果是五个折模型正类概率的平均值，不是五次测试指标的平均值。

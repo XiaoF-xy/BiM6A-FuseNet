@@ -33,6 +33,7 @@ from model_birna_film import (
     HandcraftedOnlyClassifier,
 )
 from model_birna_film_proj import BiRNAFiLMProjectedConcatClassifier
+from model_birna_mke import BiRNAFiLMMKEClassifier
 from model_birna_nuc import BiRNANucClassifier, load_birna_tokenizer
 from training_utils import (
     DualViewDataCollator,
@@ -149,6 +150,28 @@ def parse_args():
         "--use_projected_concat",
         action="store_true",
         help="Project both branches independently to 256 dimensions before concatenation.",
+    )
+    parser.add_argument(
+        "--use_mke_handcrafted",
+        action="store_true",
+        help="Use the four-stream MKE ResNet-ECA handcrafted encoder.",
+    )
+    parser.add_argument(
+        "--use_full_mke_eca",
+        action="store_true",
+        help="Add full post-fusion channel and multi-scale spatial MKE-ECA attention.",
+    )
+    parser.add_argument(
+        "--fusion_dim_policy",
+        choices=["native", "proj256"],
+        default="native",
+        help="MKE fusion dimensions: asymmetric native widths or aligned 256-dimensional projections.",
+    )
+    parser.add_argument(
+        "--model_label",
+        type=str,
+        default="BiM6A-FuseNet-v1",
+        help="Model name written into ROC/PR plot legends and result metadata.",
     )
     parser.add_argument("--gated_fusion_dim", type=int, default=256)
     parser.add_argument("--gated_hidden_dim", type=int, default=128)
@@ -270,14 +293,24 @@ def train_one_fold(
             cnn_kernel_sizes=args.cnn_kernel_sizes,
         )
     elif args.use_film:
-        if args.use_projected_concat:
+        if args.use_mke_handcrafted:
+            film_model_cls = BiRNAFiLMMKEClassifier
+        elif args.use_projected_concat:
             film_model_cls = BiRNAFiLMProjectedConcatClassifier
         elif args.use_gated_fusion:
             film_model_cls = BiRNAFiLMGatedHandcraftedClassifier
         else:
             film_model_cls = BiRNAFiLMHandcraftedClassifier if args.use_handcrafted_features else BiRNAFiLMLocalClassifier
         model_extra_kwargs = {}
-        if args.use_handcrafted_features:
+        if args.use_mke_handcrafted:
+            model_extra_kwargs.update(
+                {
+                    "handcrafted_feature_names": args.handcrafted_feature_names,
+                    "use_full_mke_eca": args.use_full_mke_eca,
+                    "fusion_dim_policy": args.fusion_dim_policy,
+                }
+            )
+        elif args.use_handcrafted_features:
             model_extra_kwargs.update(
                 {
                     "handcrafted_input_channels": handcrafted_input_channels,
@@ -531,12 +564,30 @@ def main():
         raise ValueError("--use_projected_concat requires both --use_film and --use_handcrafted_features.")
     if args.use_projected_concat and args.use_gated_fusion:
         raise ValueError("--use_projected_concat cannot be combined with --use_gated_fusion.")
+    if args.use_full_mke_eca and not args.use_mke_handcrafted:
+        raise ValueError("--use_full_mke_eca requires --use_mke_handcrafted.")
+    if args.use_mke_handcrafted:
+        if not args.use_film or not args.use_handcrafted_features:
+            raise ValueError("--use_mke_handcrafted requires --use_film and --use_handcrafted_features.")
+        expected_features = ["onehot", "ncp", "eiip", "enac"]
+        if args.handcrafted_feature_names != expected_features:
+            raise ValueError(
+                "--use_mke_handcrafted requires feature order onehot,ncp,eiip,enac; "
+                f"got: {','.join(args.handcrafted_feature_names)}"
+            )
+        if args.use_projected_concat or args.use_gated_fusion:
+            raise ValueError(
+                "--use_mke_handcrafted uses --fusion_dim_policy and cannot be combined with "
+                "legacy projected-concat or gated-fusion switches."
+            )
     if args.handcrafted_only:
         args.use_handcrafted_features = True
         if args.use_gated_fusion:
             raise ValueError("--handcrafted_only cannot be combined with --use_gated_fusion.")
         if args.use_projected_concat:
             raise ValueError("--handcrafted_only cannot be combined with --use_projected_concat.")
+        if args.use_mke_handcrafted:
+            raise ValueError("--handcrafted_only cannot be combined with --use_mke_handcrafted.")
         if args.use_lora:
             raise ValueError("--handcrafted_only cannot be combined with --use_lora.")
         if args.use_bpe_view:
@@ -576,8 +627,14 @@ def main():
             f"output_dim={args.handcrafted_output_dim}, "
             f"handcrafted_only={args.handcrafted_only}, "
             f"use_gated_fusion={args.use_gated_fusion}, "
-            f"use_projected_concat={args.use_projected_concat}"
+            f"use_projected_concat={args.use_projected_concat}, "
+            f"use_mke_handcrafted={args.use_mke_handcrafted}"
         )
+        if args.use_mke_handcrafted:
+            print(
+                "mke_handcrafted_config: "
+                f"full_mke_eca={args.use_full_mke_eca}, fusion_dim_policy={args.fusion_dim_policy}"
+            )
         if args.use_gated_fusion:
             print(
                 "gated_fusion_config: "
@@ -658,7 +715,7 @@ def main():
     plot_artifacts = save_paper_curves(
         ensemble_rows,
         args.output_dir / "plots",
-        model_label="BiM6A-FuseNet-v1",
+        model_label=args.model_label,
     )
     ensemble_payload = {
         "method": "five_model_soft_voting",
