@@ -12,6 +12,7 @@ from tqdm import tqdm
 
 from dataset_utils import SequenceSample, sequence_to_bpe_text, sequence_to_nuc_text
 from handcrafted_features import handcrafted_feature_matrix
+from mke_official_features import official_mke_feature_matrix
 from metrics_utils import compute_binary_metrics
 
 
@@ -27,6 +28,19 @@ class RNANucDataset(Dataset):
         return {
             "sequence": sample.sequence,
             "label": sample.label,
+        }
+
+
+class OfficialMKEDataCollator:
+    """Build the public MKE 13-channel tensor without loading a tokenizer."""
+
+    def __call__(self, batch):
+        sequences = [item["sequence"] for item in batch]
+        features = [official_mke_feature_matrix(sequence) for sequence in sequences]
+        return {
+            "handcrafted_features": torch.tensor(np.stack(features, axis=0), dtype=torch.float32),
+            "labels": torch.tensor([item["label"] for item in batch], dtype=torch.long),
+            "sequences": sequences,
         }
 
 

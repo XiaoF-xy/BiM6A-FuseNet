@@ -70,8 +70,12 @@ def test_portable_check_requires_all_mke_variant_entrypoints():
         "experiments/mke_variants_common.py",
         "experiments/v2a_mke_res_eca_native/config_v2a.py",
         "experiments/v2b_mke_res_eca_proj256/config_v2b.py",
+        "experiments/v2c_mke_handcrafted_only_official4c/config_v2c.py",
         "experiments/v3a_full_mke_eca_native/config_v3a.py",
         "experiments/v3b_full_mke_eca_proj256/config_v3b.py",
+        "src/mke_official_features.py",
+        "src/model_mke_official.py",
+        "src/training_control.py",
     } <= required
 
 

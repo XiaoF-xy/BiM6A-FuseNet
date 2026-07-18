@@ -112,3 +112,52 @@ def test_mke_version_configs_differ_only_in_stage_policy_and_metadata():
     assert v3a.model.lora_target_modules == v3b.model.lora_target_modules == ["Wqkv"]
     assert v2a.model.use_full_mke_eca is v2b.model.use_full_mke_eca is False
     assert v3a.model.use_full_mke_eca is v3b.model.use_full_mke_eca is True
+
+
+def test_v2c_official_handcrafted_command_is_source_faithful_and_tokenizer_free():
+    config = load_experiment_config("v2c_mke_handcrafted_only_official4c", "H_b", seed=42)
+    command = build_cv_command(config)
+    joined = " ".join(command)
+
+    assert config.model.use_official_mke_handcrafted is True
+    assert config.model.handcrafted_only is True
+    assert config.model.handcrafted_feature_names == ["onehot", "chemical4", "eiip", "enac"]
+    assert config.training.epochs == 100
+    assert config.training.batch_size == 64
+    assert config.training.lr == pytest.approx(1e-3)
+    assert config.training.weight_decay == pytest.approx(1e-5)
+    assert config.training.optimizer == "adam"
+    assert config.training.scheduler_patience == 10
+    assert config.training.early_stopping_patience == 20
+    assert "--use_official_mke_handcrafted" in command
+    assert command[command.index("--optimizer") + 1] == "adam"
+    assert command[command.index("--scheduler_patience") + 1] == "10"
+    assert command[command.index("--early_stopping_patience") + 1] == "20"
+    assert command[command.index("--model_label") + 1] == "MKE-ResNet-official4c"
+    assert "--use_film" not in command
+    assert "--use_lora" not in command
+    assert "--use_bpe_view" not in command
+    assert "--use_mke_handcrafted" not in command
+    assert "--use_full_mke_eca" not in command
+    assert "--selection_metric ACC" in joined
+
+
+def test_v2c_training_options_do_not_leak_into_existing_versions():
+    for version in (
+        "v1_baseline",
+        "v1b_proj256_concat",
+        "v2a_mke_res_eca_native",
+        "v2b_mke_res_eca_proj256",
+        "v3a_full_mke_eca_native",
+        "v3b_full_mke_eca_proj256",
+    ):
+        config = load_experiment_config(version, "H_b", seed=42)
+        command = build_cv_command(config)
+
+        assert config.training.optimizer == "adamw"
+        assert config.training.scheduler_patience is None
+        assert config.training.early_stopping_patience is None
+        assert "--optimizer" not in command
+        assert "--scheduler_patience" not in command
+        assert "--early_stopping_patience" not in command
+        assert "--use_official_mke_handcrafted" not in command

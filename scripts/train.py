@@ -68,6 +68,17 @@ def build_cv_command(config) -> list[str]:
         "--selection_metric",
         training.selection_metric,
     ]
+    if training.optimizer != "adamw":
+        command.extend(["--optimizer", training.optimizer])
+    if training.scheduler_patience is not None:
+        command.extend([
+            "--scheduler_patience",
+            str(training.scheduler_patience),
+            "--scheduler_factor",
+            str(training.scheduler_factor),
+        ])
+    if training.early_stopping_patience is not None:
+        command.extend(["--early_stopping_patience", str(training.early_stopping_patience)])
     if model.freeze_backbone:
         command.append("--freeze_backbone")
     if not model.use_center_pooling:
@@ -98,7 +109,15 @@ def build_cv_command(config) -> list[str]:
             "--lora_target_modules",
             ",".join(model.lora_target_modules),
         ])
-    if model.use_handcrafted_features:
+    if model.use_official_mke_handcrafted:
+        command.extend([
+            "--use_official_mke_handcrafted",
+            "--handcrafted_feature_names",
+            ",".join(model.handcrafted_feature_names),
+            "--model_label",
+            config.experiment.plot_label,
+        ])
+    elif model.use_handcrafted_features:
         command.extend([
             "--use_handcrafted_features",
             "--handcrafted_feature_names",

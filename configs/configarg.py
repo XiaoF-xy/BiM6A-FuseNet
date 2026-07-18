@@ -32,6 +32,9 @@ BASE_VERSION_CONFIG_MODULES = {
     "v1b_proj256_concat": "experiments.v1b_proj256_concat.config_v1b",
     "v2a_mke_res_eca_native": "experiments.v2a_mke_res_eca_native.config_v2a",
     "v2b_mke_res_eca_proj256": "experiments.v2b_mke_res_eca_proj256.config_v2b",
+    "v2c_mke_handcrafted_only_official4c": (
+        "experiments.v2c_mke_handcrafted_only_official4c.config_v2c"
+    ),
     "v3a_full_mke_eca_native": "experiments.v3a_full_mke_eca_native.config_v3a",
     "v3b_full_mke_eca_proj256": "experiments.v3b_full_mke_eca_proj256.config_v3b",
 }
@@ -76,6 +79,7 @@ class ModelConfig:
     use_gated_fusion: bool = False
     use_projected_concat: bool = False
     use_mke_handcrafted: bool = False
+    use_official_mke_handcrafted: bool = False
     use_full_mke_eca: bool = False
     fusion_dim_policy: str = "native"
     gated_fusion_dim: int = 256
@@ -101,6 +105,10 @@ class TrainConfig:
     weight_decay: float = 0.01
     seed: int = 42
     max_length: int = 64
+    optimizer: str = "adamw"
+    scheduler_patience: int | None = None
+    scheduler_factor: float = 0.1
+    early_stopping_patience: int | None = None
 
 
 @dataclass

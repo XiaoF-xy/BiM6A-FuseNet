@@ -35,11 +35,14 @@ from model_birna_film import (
 from model_birna_film_proj import BiRNAFiLMProjectedConcatClassifier
 from model_birna_mke import BiRNAFiLMMKEClassifier
 from model_birna_nuc import BiRNANucClassifier, load_birna_tokenizer
+from model_mke_official import OfficialMKEClassifier
+from training_control import EarlyStopping, build_optimizer, build_plateau_scheduler
 from training_utils import (
     DualViewDataCollator,
     RNANucDataset,
     NucDataCollator,
     NucViewDataCollator,
+    OfficialMKEDataCollator,
     append_train_log,
     evaluate,
     metric_score,
@@ -74,6 +77,25 @@ def parse_args():
         type=float,
         default=0.01,
         help="AdamW weight decay. Default is 0.01, matching PyTorch AdamW's implicit default.",
+    )
+    parser.add_argument(
+        "--optimizer",
+        choices=["adam", "adamw"],
+        default="adamw",
+        help="Optimizer family. Existing versions default to AdamW; official handcrafted v2c uses Adam.",
+    )
+    parser.add_argument(
+        "--scheduler_patience",
+        type=int,
+        default=None,
+        help="Enable ReduceLROnPlateau on validation loss with this patience; omitted means disabled.",
+    )
+    parser.add_argument("--scheduler_factor", type=float, default=0.1)
+    parser.add_argument(
+        "--early_stopping_patience",
+        type=int,
+        default=None,
+        help="Stop after this many epochs without validation selection-metric improvement; omitted means disabled.",
     )
     parser.add_argument("--seed", type=int, default=42)
     parser.add_argument("--max_length", type=int, default=64)
@@ -157,6 +179,11 @@ def parse_args():
         help="Use the four-stream MKE ResNet-ECA handcrafted encoder.",
     )
     parser.add_argument(
+        "--use_official_mke_handcrafted",
+        action="store_true",
+        help="Use the public source-compatible 13-channel, handcrafted-only MKE-ResNet classifier.",
+    )
+    parser.add_argument(
         "--use_full_mke_eca",
         action="store_true",
         help="Add full post-fusion channel and multi-scale spatial MKE-ECA attention.",
@@ -235,23 +262,28 @@ def make_loader(
     use_film: bool = False,
     use_handcrafted_features: bool = False,
     handcrafted_feature_names: list[str] | None = None,
+    use_official_mke_handcrafted: bool = False,
 ):
-    if use_bpe_view:
+    if use_official_mke_handcrafted:
+        collator = OfficialMKEDataCollator()
+    elif use_bpe_view:
         collator_cls = DualViewDataCollator
     elif use_film:
         collator_cls = NucViewDataCollator
     else:
         collator_cls = NucDataCollator
-    return DataLoader(
-        RNANucDataset(samples),
-        batch_size=batch_size,
-        shuffle=shuffle,
-        collate_fn=collator_cls(
+    if not use_official_mke_handcrafted:
+        collator = collator_cls(
             tokenizer=tokenizer,
             max_length=max_length,
             include_handcrafted=use_handcrafted_features,
             handcrafted_feature_names=handcrafted_feature_names,
-        ),
+        )
+    return DataLoader(
+        RNANucDataset(samples),
+        batch_size=batch_size,
+        shuffle=shuffle,
+        collate_fn=collator,
         num_workers=0,
     )
 
@@ -284,8 +316,12 @@ def train_one_fold(
     }
     if args.use_handcrafted_features and not args.use_film and not args.handcrafted_only:
         raise ValueError("--use_handcrafted_features requires --use_film unless --handcrafted_only is set.")
-    handcrafted_input_channels = handcrafted_channel_count(args.handcrafted_feature_names)
-    if args.handcrafted_only:
+    handcrafted_input_channels = None
+    if not args.use_official_mke_handcrafted:
+        handcrafted_input_channels = handcrafted_channel_count(args.handcrafted_feature_names)
+    if args.use_official_mke_handcrafted:
+        model = OfficialMKEClassifier(sequence_length=41)
+    elif args.handcrafted_only:
         model = HandcraftedOnlyClassifier(
             handcrafted_input_channels=handcrafted_input_channels,
             handcrafted_cnn_channels=args.handcrafted_cnn_channels,
@@ -344,10 +380,21 @@ def train_one_fold(
     total_params = sum(parameter.numel() for parameter in model.parameters())
     print(f"Fold {fold_idx} trainable_params: {trainable_params:,} / total_params: {total_params:,}")
 
-    optimizer = torch.optim.AdamW(
+    optimizer = build_optimizer(
         [parameter for parameter in model.parameters() if parameter.requires_grad],
+        name=args.optimizer,
         lr=args.lr,
         weight_decay=args.weight_decay,
+    )
+    scheduler = build_plateau_scheduler(
+        optimizer,
+        patience=args.scheduler_patience,
+        factor=args.scheduler_factor,
+    )
+    early_stopping = (
+        EarlyStopping(args.early_stopping_patience)
+        if args.early_stopping_patience is not None
+        else None
     )
     criterion = nn.CrossEntropyLoss()
     train_loader = make_loader(
@@ -360,6 +407,7 @@ def train_one_fold(
         use_film=args.use_film,
         use_handcrafted_features=args.use_handcrafted_features,
         handcrafted_feature_names=args.handcrafted_feature_names,
+        use_official_mke_handcrafted=args.use_official_mke_handcrafted,
     )
     val_loader = make_loader(
         val_samples,
@@ -371,6 +419,7 @@ def train_one_fold(
         use_film=args.use_film,
         use_handcrafted_features=args.use_handcrafted_features,
         handcrafted_feature_names=args.handcrafted_feature_names,
+        use_official_mke_handcrafted=args.use_official_mke_handcrafted,
     )
     test_loader = make_loader(
         independent_test_samples,
@@ -382,6 +431,7 @@ def train_one_fold(
         use_film=args.use_film,
         use_handcrafted_features=args.use_handcrafted_features,
         handcrafted_feature_names=args.handcrafted_feature_names,
+        use_official_mke_handcrafted=args.use_official_mke_handcrafted,
     )
 
     best_score = -math.inf
@@ -404,6 +454,8 @@ def train_one_fold(
             device=device,
             desc=f"Fold {fold_idx} epoch {epoch} {selection_desc}",
         )
+        if scheduler is not None:
+            scheduler.step(val_loss)
         score = metric_score(val_metrics, selection_metric=args.selection_metric)
         is_best = score > best_score
         if is_best:
@@ -431,7 +483,8 @@ def train_one_fold(
         print(
             f"Fold {fold_idx} epoch {epoch:03d} "
             f"train_loss={train_loss:.4f} val_loss={val_loss:.4f} "
-            f"{format_metrics(val_metrics)} best_{args.selection_metric}={best_score:.4f}"
+            f"{format_metrics(val_metrics)} best_{args.selection_metric}={best_score:.4f} "
+            f"lr={optimizer.param_groups[0]['lr']:.6g}"
         )
         row = {
             "epoch": epoch,
@@ -442,6 +495,12 @@ def train_one_fold(
         }
         row.update(val_metrics)
         append_train_log(train_log_path, row)
+        if early_stopping is not None and early_stopping.update(improved=is_best):
+            print(
+                f"Fold {fold_idx} early stopping at epoch {epoch}: "
+                f"no {args.selection_metric} improvement for {early_stopping.patience} epochs."
+            )
+            break
 
     checkpoint = torch.load(best_model_path, map_location=device)
     model.load_state_dict(checkpoint["model_state_dict"])
@@ -472,6 +531,7 @@ def train_one_fold(
         "selection_set": "benchmark.csv held-out fold",
         "test_set_role": "final_evaluation_only",
         "best_epoch": best_epoch,
+        "epochs_completed": epoch,
         "best_score": best_score,
         "selection_metric": args.selection_metric,
         "best_model_path": str(best_model_path),
@@ -510,6 +570,8 @@ def train_one_fold(
         json.dump(json_safe_metrics(fold_payload), handle, indent=2, ensure_ascii=False)
 
     del checkpoint, optimizer, criterion, train_loader, val_loader, test_loader, model
+    if scheduler is not None:
+        del scheduler
     gc.collect()
     if torch.cuda.is_available():
         torch.cuda.empty_cache()
@@ -545,6 +607,12 @@ def main():
         raise ValueError("--batch_size must be a positive integer.")
     if args.weight_decay < 0:
         raise ValueError("--weight_decay must be non-negative.")
+    if args.scheduler_patience is not None and args.scheduler_patience < 0:
+        raise ValueError("--scheduler_patience must be non-negative when provided.")
+    if not 0.0 < args.scheduler_factor < 1.0:
+        raise ValueError("--scheduler_factor must be between 0 and 1.")
+    if args.early_stopping_patience is not None and args.early_stopping_patience <= 0:
+        raise ValueError("--early_stopping_patience must be positive when provided.")
     if args.max_length < 43:
         raise ValueError("--max_length must be at least 43 for 41 NUC tokens plus CLS/SEP.")
     if args.local_window_radius < 0:
@@ -557,7 +625,21 @@ def main():
         raise ValueError("--gated_fusion_dim must be a positive integer.")
     if args.gated_hidden_dim <= 0:
         raise ValueError("--gated_hidden_dim must be a positive integer.")
-    args.handcrafted_feature_names = parse_feature_names(args.handcrafted_feature_names)
+    if args.use_official_mke_handcrafted:
+        args.handcrafted_feature_names = [
+            item.strip().lower()
+            for item in args.handcrafted_feature_names.split(",")
+            if item.strip()
+        ]
+        expected_official_features = ["onehot", "chemical4", "eiip", "enac"]
+        if args.handcrafted_feature_names != expected_official_features:
+            raise ValueError(
+                "--use_official_mke_handcrafted requires feature order "
+                "onehot,chemical4,eiip,enac; "
+                f"got: {','.join(args.handcrafted_feature_names)}"
+            )
+    else:
+        args.handcrafted_feature_names = parse_feature_names(args.handcrafted_feature_names)
     if args.use_gated_fusion and (not args.use_film or not args.use_handcrafted_features):
         raise ValueError("--use_gated_fusion requires both --use_film and --use_handcrafted_features.")
     if args.use_projected_concat and (not args.use_film or not args.use_handcrafted_features):
@@ -579,6 +661,22 @@ def main():
             raise ValueError(
                 "--use_mke_handcrafted uses --fusion_dim_policy and cannot be combined with "
                 "legacy projected-concat or gated-fusion switches."
+            )
+    if args.use_official_mke_handcrafted:
+        args.use_handcrafted_features = True
+        args.handcrafted_only = True
+        if args.use_mke_handcrafted or args.use_full_mke_eca:
+            raise ValueError(
+                "--use_official_mke_handcrafted cannot be combined with the 12-channel MKE fusion flags."
+            )
+        if args.use_film or args.use_lora or args.use_bpe_view:
+            raise ValueError(
+                "--use_official_mke_handcrafted is a pure handcrafted model and cannot use FiLM, LoRA, or BPE."
+            )
+        if args.use_projected_concat or args.use_gated_fusion:
+            raise ValueError(
+                "--use_official_mke_handcrafted cannot be combined with projected-concat "
+                "or gated-fusion switches."
             )
     if args.handcrafted_only:
         args.use_handcrafted_features = True
@@ -605,7 +703,11 @@ def main():
     print(f"output_dir: {args.output_dir}")
     print("eval_protocol: strict_cv")
     print(f"selection_metric: {args.selection_metric}")
+    print(f"optimizer: {args.optimizer}")
     print(f"weight_decay: {args.weight_decay}")
+    print(f"scheduler_patience: {args.scheduler_patience}")
+    print(f"scheduler_factor: {args.scheduler_factor}")
+    print(f"early_stopping_patience: {args.early_stopping_patience}")
     print(f"folds: {args.folds}")
     print(f"freeze_backbone: {args.freeze_backbone}")
     print(f"use_center_pooling: {not args.disable_center_pooling}")
@@ -619,16 +721,22 @@ def main():
     print(f"use_lora: {args.use_lora}")
     print(f"use_handcrafted_features: {args.use_handcrafted_features}")
     if args.use_handcrafted_features:
+        handcrafted_channels = (
+            13
+            if args.use_official_mke_handcrafted
+            else handcrafted_channel_count(args.handcrafted_feature_names)
+        )
         print(
             "handcrafted_config: "
             f"features={','.join(args.handcrafted_feature_names)}, "
-            f"channels={handcrafted_channel_count(args.handcrafted_feature_names)}, "
+            f"channels={handcrafted_channels}, "
             f"cnn_channels={args.handcrafted_cnn_channels}, "
             f"output_dim={args.handcrafted_output_dim}, "
             f"handcrafted_only={args.handcrafted_only}, "
             f"use_gated_fusion={args.use_gated_fusion}, "
             f"use_projected_concat={args.use_projected_concat}, "
-            f"use_mke_handcrafted={args.use_mke_handcrafted}"
+            f"use_mke_handcrafted={args.use_mke_handcrafted}, "
+            f"use_official_mke_handcrafted={args.use_official_mke_handcrafted}"
         )
         if args.use_mke_handcrafted:
             print(
@@ -654,7 +762,9 @@ def main():
     if args.folds > min_class_count:
         raise ValueError(f"--folds={args.folds} is larger than the smallest class count: {min_class_count}")
 
-    tokenizer = load_birna_tokenizer(args.tokenizer_dir, max_length=args.max_length)
+    tokenizer = None
+    if not args.use_official_mke_handcrafted:
+        tokenizer = load_birna_tokenizer(args.tokenizer_dir, max_length=args.max_length)
     device = select_device()
     print(f"device: {device}")
     print("Data stats:")
