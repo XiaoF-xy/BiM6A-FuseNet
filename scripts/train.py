@@ -126,6 +126,10 @@ def build_cv_command(config) -> list[str]:
             "--lora_target_modules",
             ",".join(model.lora_target_modules),
         ])
+    if model.use_last4_scalar_mix:
+        command.append("--use_last4_scalar_mix")
+    if model.use_dora:
+        command.append("--use_dora")
     if model.use_birna_single_branch:
         command.extend([
             "--use_birna_single_branch",

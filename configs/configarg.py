@@ -37,6 +37,10 @@ BASE_VERSION_CONFIG_MODULES = {
         "experiments.v0d_birna_lora_attention_ffn.config_v0d"
     ),
     "v0e_birna_nuc_loraplus": "experiments.v0e_birna_nuc_loraplus.config_v0e",
+    "v0f_birna_last4_scalar_mix": (
+        "experiments.v0f_birna_last4_scalar_mix.config_v0f"
+    ),
+    "v0g_birna_nuc_dora": "experiments.v0g_birna_nuc_dora.config_v0g",
     "v1_baseline": "experiments.v1_baseline.config_v1",
     "v1b_proj256_concat": "experiments.v1b_proj256_concat.config_v1b",
     "v2a_mke_res_eca_native": "experiments.v2a_mke_res_eca_native.config_v2a",
@@ -77,6 +81,8 @@ class ModelConfig:
     cnn_kernel_sizes: list[int] = field(default_factory=lambda: [3, 5, 7])
     use_lora: bool = False
     use_birna_single_branch: bool = False
+    use_last4_scalar_mix: bool = False
+    use_dora: bool = False
     lora_r: int = 8
     lora_alpha: int = 32
     lora_dropout: float = 0.05

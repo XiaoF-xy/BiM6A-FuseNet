@@ -77,6 +77,49 @@ def test_v0e_changes_only_v0a_optimizer_to_loraplus_groups():
 
 
 @pytest.mark.parametrize(
+    ("version", "changed_field", "expected_flag"),
+    [
+        ("v0f_birna_last4_scalar_mix", "use_last4_scalar_mix", "--use_last4_scalar_mix"),
+        ("v0g_birna_nuc_dora", "use_dora", "--use_dora"),
+    ],
+)
+def test_new_birna_versions_change_only_one_v0a_model_option(
+    version,
+    changed_field,
+    expected_flag,
+):
+    baseline = load_experiment_config("v0a_birna_nuc_lora", "H_b", seed=42)
+    candidate = load_experiment_config(version, "H_b", seed=42)
+    command = build_cv_command(candidate)
+
+    baseline_model = asdict(baseline.model)
+    candidate_model = asdict(candidate.model)
+    assert baseline_model.pop(changed_field) is False
+    assert candidate_model.pop(changed_field) is True
+    assert candidate_model == baseline_model
+
+    baseline_training = asdict(baseline.training)
+    candidate_training = asdict(candidate.training)
+    baseline_training.pop("output_dir")
+    candidate_training.pop("output_dir")
+    assert candidate_training == baseline_training
+
+    assert expected_flag in command
+    other_flag = "--use_dora" if expected_flag == "--use_last4_scalar_mix" else "--use_last4_scalar_mix"
+    assert other_flag not in command
+
+
+def test_v0a_does_not_enable_scalar_mix_or_dora():
+    config = load_experiment_config("v0a_birna_nuc_lora", "H_b", seed=42)
+    command = build_cv_command(config)
+
+    assert config.model.use_last4_scalar_mix is False
+    assert config.model.use_dora is False
+    assert "--use_last4_scalar_mix" not in command
+    assert "--use_dora" not in command
+
+
+@pytest.mark.parametrize(
     ("version", "expected_targets"),
     [
         ("v0c_birna_lora_full_attention", ["Wqkv", "attention.output.dense"]),

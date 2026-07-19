@@ -72,6 +72,8 @@ def test_portable_check_requires_all_mke_variant_entrypoints():
         "experiments/v0c_birna_lora_full_attention/config_v0c.py",
         "experiments/v0d_birna_lora_attention_ffn/config_v0d.py",
         "experiments/v0e_birna_nuc_loraplus/config_v0e.py",
+        "experiments/v0f_birna_last4_scalar_mix/config_v0f.py",
+        "experiments/v0g_birna_nuc_dora/config_v0g.py",
         "src/model_birna_mke.py",
         "src/model_mke_handcrafted.py",
         "experiments/mke_variants_common.py",

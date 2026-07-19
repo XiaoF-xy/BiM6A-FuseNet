@@ -20,6 +20,8 @@ REQUIRED = [
     ROOT / "experiments" / "v0c_birna_lora_full_attention" / "config_v0c.py",
     ROOT / "experiments" / "v0d_birna_lora_attention_ffn" / "config_v0d.py",
     ROOT / "experiments" / "v0e_birna_nuc_loraplus" / "config_v0e.py",
+    ROOT / "experiments" / "v0f_birna_last4_scalar_mix" / "config_v0f.py",
+    ROOT / "experiments" / "v0g_birna_nuc_dora" / "config_v0g.py",
     ROOT / "experiments" / "v1_baseline" / "config_v1.py",
     ROOT / "experiments" / "mke_variants_common.py",
     ROOT / "experiments" / "v2a_mke_res_eca_native" / "config_v2a.py",

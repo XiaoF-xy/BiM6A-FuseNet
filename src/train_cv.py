@@ -163,6 +163,16 @@ def parse_args():
         help="Comma-separated positive odd Conv1d kernel sizes for CNN FiLM NUC branch.",
     )
     parser.add_argument("--use_lora", action="store_true")
+    parser.add_argument(
+        "--use_last4_scalar_mix",
+        action="store_true",
+        help="Learn a softmax mixture of the final four BiRNA-BERT encoder layers.",
+    )
+    parser.add_argument(
+        "--use_dora",
+        action="store_true",
+        help="Use PEFT DoRA for the configured LoRA target modules.",
+    )
     parser.add_argument("--lora_r", type=int, default=8)
     parser.add_argument("--lora_alpha", type=int, default=32)
     parser.add_argument("--lora_dropout", type=float, default=0.05)
@@ -249,6 +259,20 @@ def validate_single_branch_options(args) -> None:
             )
     elif any(value is not None for value in lora_rates.values()):
         raise ValueError("LoRA+ learning-rate flags require --use_loraplus.")
+
+    advanced_lora_flags = {
+        "--use_last4_scalar_mix": getattr(args, "use_last4_scalar_mix", False),
+        "--use_dora": getattr(args, "use_dora", False),
+    }
+    invalid_advanced_flags = [
+        name
+        for name, enabled in advanced_lora_flags.items()
+        if enabled and (not args.use_birna_single_branch or not getattr(args, "use_lora", False))
+    ]
+    if invalid_advanced_flags:
+        raise ValueError(
+            f"{', '.join(invalid_advanced_flags)} require --use_birna_single_branch and --use_lora."
+        )
 
     if not args.use_birna_single_branch:
         return
@@ -389,7 +413,11 @@ def train_one_fold(
     if args.use_official_mke_handcrafted:
         model = OfficialMKEClassifier(sequence_length=41)
     elif args.use_birna_single_branch:
-        model = BiRNASingleBranchClassifier(**common_model_kwargs)
+        model = BiRNASingleBranchClassifier(
+            **common_model_kwargs,
+            use_last4_scalar_mix=args.use_last4_scalar_mix,
+            use_dora=args.use_dora,
+        )
     elif args.handcrafted_only:
         model = HandcraftedOnlyClassifier(
             handcrafted_input_channels=handcrafted_input_channels,
@@ -817,6 +845,8 @@ def main():
         print(f"film_nuc_pooling: {args.film_nuc_pooling}")
         print(f"cnn_kernel_sizes: {args.cnn_kernel_sizes}")
     print(f"use_lora: {args.use_lora}")
+    print(f"use_last4_scalar_mix: {args.use_last4_scalar_mix}")
+    print(f"use_dora: {args.use_dora}")
     print(f"use_loraplus: {args.use_loraplus}")
     print(f"use_handcrafted_features: {args.use_handcrafted_features}")
     if args.use_handcrafted_features:
