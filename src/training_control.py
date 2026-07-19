@@ -4,6 +4,11 @@ from collections.abc import Iterable
 
 import torch
 
+try:
+    from .loraplus import partition_loraplus_named_parameters
+except ImportError:  # pragma: no cover - direct src/train_cv.py execution
+    from loraplus import partition_loraplus_named_parameters
+
 
 def build_optimizer(
     parameters: Iterable[torch.nn.Parameter],
@@ -19,6 +24,46 @@ def build_optimizer(
     if optimizer_name == "adamw":
         return torch.optim.AdamW(parameters, **kwargs)
     raise ValueError(f"Unsupported optimizer: {name}. Supported optimizers: adam, adamw")
+
+
+def build_loraplus_optimizer(
+    named_parameters,
+    *,
+    name: str,
+    lora_a_lr: float,
+    lora_b_lr: float,
+    classifier_lr: float,
+    weight_decay: float,
+) -> torch.optim.Optimizer:
+    """Build an optimizer with distinct LoRA A, LoRA B, and head learning rates."""
+    learning_rates = {
+        "lora_A": float(lora_a_lr),
+        "lora_B": float(lora_b_lr),
+        "classifier": float(classifier_lr),
+    }
+    invalid = {
+        group_name: lr
+        for group_name, lr in learning_rates.items()
+        if lr <= 0.0
+    }
+    if invalid:
+        raise ValueError(f"LoRA+ learning rates must be positive, got: {invalid}")
+
+    groups = partition_loraplus_named_parameters(named_parameters)
+    parameter_groups = [
+        {
+            "params": groups[group_name],
+            "lr": learning_rates[group_name],
+            "group_name": group_name,
+        }
+        for group_name in ("lora_A", "lora_B", "classifier")
+    ]
+    return build_optimizer(
+        parameter_groups,
+        name=name,
+        lr=classifier_lr,
+        weight_decay=weight_decay,
+    )
 
 
 def build_plateau_scheduler(

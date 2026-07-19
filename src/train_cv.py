@@ -40,6 +40,7 @@ from model_mke_official import OfficialMKEClassifier
 from training_control import (
     EarlyStopping,
     build_constant_warmup_scheduler,
+    build_loraplus_optimizer,
     build_optimizer,
     build_plateau_scheduler,
 )
@@ -166,6 +167,14 @@ def parse_args():
     parser.add_argument("--lora_alpha", type=int, default=32)
     parser.add_argument("--lora_dropout", type=float, default=0.05)
     parser.add_argument("--lora_target_modules", type=str, default="Wqkv")
+    parser.add_argument(
+        "--use_loraplus",
+        action="store_true",
+        help="Use separate learning rates for LoRA A, LoRA B, and the classifier head.",
+    )
+    parser.add_argument("--lora_a_lr", type=float, default=None)
+    parser.add_argument("--lora_b_lr", type=float, default=None)
+    parser.add_argument("--classifier_lr", type=float, default=None)
     parser.add_argument("--use_handcrafted_features", action="store_true")
     parser.add_argument(
         "--handcrafted_feature_names",
@@ -223,6 +232,24 @@ def parse_args():
 
 
 def validate_single_branch_options(args) -> None:
+    use_loraplus = getattr(args, "use_loraplus", False)
+    lora_rates = {
+        "--lora_a_lr": getattr(args, "lora_a_lr", None),
+        "--lora_b_lr": getattr(args, "lora_b_lr", None),
+        "--classifier_lr": getattr(args, "classifier_lr", None),
+    }
+    if use_loraplus:
+        if not args.use_birna_single_branch or not getattr(args, "use_lora", False):
+            raise ValueError("--use_loraplus requires --use_birna_single_branch and --use_lora.")
+        invalid = {name: value for name, value in lora_rates.items() if value is None or value <= 0.0}
+        if invalid:
+            raise ValueError(
+                "--use_loraplus requires positive learning rates for all parameter groups; "
+                f"got: {invalid}"
+            )
+    elif any(value is not None for value in lora_rates.values()):
+        raise ValueError("LoRA+ learning-rate flags require --use_loraplus.")
+
     if not args.use_birna_single_branch:
         return
     incompatible = {
@@ -422,12 +449,26 @@ def train_one_fold(
     total_params = sum(parameter.numel() for parameter in model.parameters())
     print(f"Fold {fold_idx} trainable_params: {trainable_params:,} / total_params: {total_params:,}")
 
-    optimizer = build_optimizer(
-        [parameter for parameter in model.parameters() if parameter.requires_grad],
-        name=args.optimizer,
-        lr=args.lr,
-        weight_decay=args.weight_decay,
-    )
+    if args.use_loraplus:
+        optimizer = build_loraplus_optimizer(
+            model.named_parameters(),
+            name=args.optimizer,
+            lora_a_lr=args.lora_a_lr,
+            lora_b_lr=args.lora_b_lr,
+            classifier_lr=args.classifier_lr,
+            weight_decay=args.weight_decay,
+        )
+        optimizer_lrs = ", ".join(
+            f"{group['group_name']}={group['lr']:.6g}" for group in optimizer.param_groups
+        )
+        print(f"Fold {fold_idx} LoRA+ learning rates: {optimizer_lrs}")
+    else:
+        optimizer = build_optimizer(
+            [parameter for parameter in model.parameters() if parameter.requires_grad],
+            name=args.optimizer,
+            lr=args.lr,
+            weight_decay=args.weight_decay,
+        )
     scheduler = build_plateau_scheduler(
         optimizer,
         patience=args.scheduler_patience,
@@ -776,6 +817,7 @@ def main():
         print(f"film_nuc_pooling: {args.film_nuc_pooling}")
         print(f"cnn_kernel_sizes: {args.cnn_kernel_sizes}")
     print(f"use_lora: {args.use_lora}")
+    print(f"use_loraplus: {args.use_loraplus}")
     print(f"use_handcrafted_features: {args.use_handcrafted_features}")
     if args.use_handcrafted_features:
         handcrafted_channels = (
@@ -811,6 +853,12 @@ def main():
             "lora_config: "
             f"r={args.lora_r}, alpha={args.lora_alpha}, dropout={args.lora_dropout}, "
             f"target_modules={args.lora_target_modules}"
+        )
+    if args.use_loraplus:
+        print(
+            "loraplus_config: "
+            f"lora_A_lr={args.lora_a_lr}, lora_B_lr={args.lora_b_lr}, "
+            f"classifier_lr={args.classifier_lr}"
         )
 
     cv_samples, independent_test_samples, data_stats = load_single_dataset_train_test(args.data_dir)

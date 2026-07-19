@@ -66,10 +66,12 @@ def test_portable_check_requires_all_mke_variant_entrypoints():
     required = {path.relative_to(ROOT).as_posix() for path in REQUIRED}
     assert {
         "src/model_birna_single.py",
+        "src/loraplus.py",
         "experiments/v0a_birna_nuc_lora/config_v0a.py",
         "experiments/v0b_birna_nuc_fullft/config_v0b.py",
         "experiments/v0c_birna_lora_full_attention/config_v0c.py",
         "experiments/v0d_birna_lora_attention_ffn/config_v0d.py",
+        "experiments/v0e_birna_nuc_loraplus/config_v0e.py",
         "src/model_birna_mke.py",
         "src/model_mke_handcrafted.py",
         "experiments/mke_variants_common.py",

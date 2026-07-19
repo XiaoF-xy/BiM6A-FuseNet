@@ -36,6 +36,7 @@ BASE_VERSION_CONFIG_MODULES = {
     "v0d_birna_lora_attention_ffn": (
         "experiments.v0d_birna_lora_attention_ffn.config_v0d"
     ),
+    "v0e_birna_nuc_loraplus": "experiments.v0e_birna_nuc_loraplus.config_v0e",
     "v1_baseline": "experiments.v1_baseline.config_v1",
     "v1b_proj256_concat": "experiments.v1b_proj256_concat.config_v1b",
     "v2a_mke_res_eca_native": "experiments.v2a_mke_res_eca_native.config_v2a",
@@ -119,6 +120,10 @@ class TrainConfig:
     scheduler_factor: float = 0.1
     early_stopping_patience: int | None = None
     warmup_ratio: float | None = None
+    use_loraplus: bool = False
+    lora_a_lr: float | None = None
+    lora_b_lr: float | None = None
+    classifier_lr: float | None = None
 
 
 @dataclass

@@ -47,6 +47,35 @@ def test_v0b_is_pure_nuc_full_finetuning_with_warmup():
     assert "--use_lora" not in command
 
 
+def test_v0e_changes_only_v0a_optimizer_to_loraplus_groups():
+    baseline = load_experiment_config("v0a_birna_nuc_lora", "H_b", seed=42)
+    candidate = load_experiment_config("v0e_birna_nuc_loraplus", "H_b", seed=42)
+    baseline_command = build_cv_command(baseline)
+    command = build_cv_command(candidate)
+
+    assert candidate.model.lora_target_modules == ["Wqkv"]
+    assert candidate.training.use_loraplus is True
+    assert candidate.training.lora_a_lr == pytest.approx(5e-5)
+    assert candidate.training.lora_b_lr == pytest.approx(8e-4)
+    assert candidate.training.classifier_lr == pytest.approx(1e-4)
+
+    assert asdict(candidate.model) == asdict(baseline.model)
+    baseline_training = asdict(baseline.training)
+    candidate_training = asdict(candidate.training)
+    baseline_training.pop("output_dir")
+    candidate_training.pop("output_dir")
+    for field in ("use_loraplus", "lora_a_lr", "lora_b_lr", "classifier_lr"):
+        baseline_training.pop(field)
+        candidate_training.pop(field)
+    assert candidate_training == baseline_training
+
+    assert "--use_loraplus" in command
+    assert "--use_loraplus" not in baseline_command
+    assert command[command.index("--lora_a_lr") + 1] == "5e-05"
+    assert command[command.index("--lora_b_lr") + 1] == "0.0008"
+    assert command[command.index("--classifier_lr") + 1] == "0.0001"
+
+
 @pytest.mark.parametrize(
     ("version", "expected_targets"),
     [

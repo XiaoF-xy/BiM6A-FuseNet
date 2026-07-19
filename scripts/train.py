@@ -81,6 +81,21 @@ def build_cv_command(config) -> list[str]:
         command.extend(["--early_stopping_patience", str(training.early_stopping_patience)])
     if training.warmup_ratio is not None:
         command.extend(["--warmup_ratio", str(training.warmup_ratio)])
+    if training.use_loraplus:
+        rates = {
+            "--lora_a_lr": training.lora_a_lr,
+            "--lora_b_lr": training.lora_b_lr,
+            "--classifier_lr": training.classifier_lr,
+        }
+        missing = [name for name, value in rates.items() if value is None]
+        if missing:
+            raise ValueError(
+                "LoRA+ requires all parameter-group learning rates; missing: "
+                + ", ".join(missing)
+            )
+        command.append("--use_loraplus")
+        for name, value in rates.items():
+            command.extend([name, str(value)])
     if model.freeze_backbone:
         command.append("--freeze_backbone")
     if not model.use_center_pooling:
