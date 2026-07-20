@@ -22,6 +22,17 @@ from configs.configarg import (  # noqa: E402
 
 RUNNABLE_VERSIONS = set(VERSION_CONFIG_MODULES)
 
+FUSION_VERSIONS = {
+    "v4a_oof_weighted_late_fusion": {
+        "method": "weighted",
+        "model_label": "BiM6A-FuseNet-v4a",
+    },
+    "v4b_oof_logistic_stacking": {
+        "method": "logistic",
+        "model_label": "BiM6A-FuseNet-v4b",
+    },
+}
+
 
 def _json_default(value: Any):
     if isinstance(value, Path):
@@ -179,17 +190,72 @@ def build_cv_command(config) -> list[str]:
     return command
 
 
+def build_fusion_command(
+    *,
+    version: str,
+    dataset: str,
+    seed: int,
+    outputs_root: Path,
+) -> list[str]:
+    if version not in FUSION_VERSIONS:
+        raise ValueError(f"Unknown fusion version: {version}")
+    spec = FUSION_VERSIONS[version]
+    return [
+        sys.executable,
+        str(PROJECT_ROOT / "scripts" / "fuse_predictions.py"),
+        "--version",
+        version,
+        "--method",
+        spec["method"],
+        "--model_label",
+        spec["model_label"],
+        "--dataset",
+        dataset,
+        "--seed",
+        str(seed),
+        "--outputs_root",
+        str(outputs_root),
+    ]
+
+
 def parse_args(default_version: str = "v1_baseline"):
     parser = argparse.ArgumentParser(description="Run a versioned BiM6A-FuseNet experiment from Python configs.")
     parser.add_argument("--version", type=str, default=default_version)
     parser.add_argument("--dataset", type=str, default="H_b")
     parser.add_argument("--seed", type=int, default=42)
+    parser.add_argument(
+        "--outputs_root",
+        type=Path,
+        default=PROJECT_ROOT / "outputs",
+        help="Output root used by v4 prediction-fusion versions.",
+    )
     parser.add_argument("--dry_run", action="store_true", help="Print resolved command without launching training.")
     return parser.parse_args()
 
 
 def main(default_version: str = "v1_baseline"):
     args = parse_args(default_version=default_version)
+    if args.version in FUSION_VERSIONS:
+        if args.seed != 42:
+            raise ValueError("v4 fusion experiments require the base strict-CV seed 42 outputs.")
+        command = build_fusion_command(
+            version=args.version,
+            dataset=args.dataset,
+            seed=args.seed,
+            outputs_root=args.outputs_root,
+        )
+        print(f"version: {args.version}")
+        print(f"dataset: {args.dataset}")
+        print(f"seed: {args.seed}")
+        print("eval_protocol: base_oof_meta_cross_fit_then_independent_evaluation")
+        print(f"outputs_root: {args.outputs_root}")
+        print("command:")
+        print(" ".join(command))
+        if args.dry_run:
+            return
+        subprocess.run(command, cwd=PROJECT_ROOT, check=True)
+        return
+
     config = load_experiment_config(version_name=args.version, dataset_name=args.dataset, seed=args.seed)
     if config.experiment.version_name not in RUNNABLE_VERSIONS:
         raise NotImplementedError(

@@ -9,7 +9,7 @@ import pytest
 from sklearn.model_selection import StratifiedKFold
 
 from configs.configarg import load_experiment_config
-from scripts.train import build_cv_command
+from scripts.train import build_cv_command, build_fusion_command
 
 
 ROOT = Path(__file__).resolve().parents[1]
@@ -161,3 +161,34 @@ def test_v2c_training_options_do_not_leak_into_existing_versions():
         assert "--scheduler_patience" not in command
         assert "--early_stopping_patience" not in command
         assert "--use_official_mke_handcrafted" not in command
+
+
+@pytest.mark.parametrize(
+    ("version", "method"),
+    [
+        ("v4a_oof_weighted_late_fusion", "weighted"),
+        ("v4b_oof_logistic_stacking", "logistic"),
+    ],
+)
+def test_v4_versions_dispatch_to_prediction_fusion(version, method, tmp_path: Path):
+    command = build_fusion_command(
+        version=version,
+        dataset="H_b",
+        seed=42,
+        outputs_root=tmp_path / "outputs",
+    )
+
+    assert command[1] == str(ROOT / "scripts" / "fuse_predictions.py")
+    assert command[command.index("--method") + 1] == method
+    assert command[command.index("--dataset") + 1] == "H_b"
+    assert command[command.index("--seed") + 1] == "42"
+    assert "src/train_cv.py" not in " ".join(command)
+
+
+def test_existing_neural_command_does_not_gain_fusion_arguments():
+    config = load_experiment_config("v1_baseline", "H_b", seed=42)
+    command = build_cv_command(config)
+
+    assert "fuse_predictions.py" not in " ".join(command)
+    assert "--base_handcrafted_version" not in command
+    assert "--base_birna_version" not in command
