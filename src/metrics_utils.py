@@ -9,7 +9,7 @@ import numpy as np
 def compute_binary_metrics(
     labels: Iterable[int],
     probs: Iterable[float],
-    threshold: float = 0.5,
+    threshold: float | Iterable[float] = 0.5,
 ) -> dict[str, float]:
     try:
         from sklearn.metrics import (
@@ -35,7 +35,20 @@ def compute_binary_metrics(
     if y_true.shape[0] != y_prob.shape[0]:
         raise ValueError(f"Metric input size mismatch: labels={y_true.shape[0]}, probs={y_prob.shape[0]}")
 
-    y_pred = (y_prob >= threshold).astype(int)
+    if np.isscalar(threshold):
+        threshold_array = float(threshold)
+        if not math.isfinite(threshold_array):
+            raise ValueError("Metric threshold must be finite.")
+    else:
+        threshold_array = np.asarray(list(threshold), dtype=float)
+        if threshold_array.shape != y_prob.shape:
+            raise ValueError(
+                f"Metric threshold size mismatch: thresholds={threshold_array.shape[0]}, probs={y_prob.shape[0]}"
+            )
+        if not np.isfinite(threshold_array).all():
+            raise ValueError("Metric thresholds must be finite.")
+
+    y_pred = (y_prob >= threshold_array).astype(int)
     tn, fp, fn, tp = confusion_matrix(y_true, y_pred, labels=[0, 1]).ravel()
     specificity = float(tn / (tn + fp)) if tn + fp else math.nan
     sensitivity = float(tp / (tp + fn)) if tp + fn else math.nan

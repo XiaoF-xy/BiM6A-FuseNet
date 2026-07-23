@@ -126,7 +126,15 @@ python train.py --version v4b_oof_logistic_stacking --dataset H_b --seed 42 --ou
 
 v4 的 benchmark 指标使用按折留出的第二层交叉拟合：每次只用另外四折 OOF 概率拟合融合规则，再预测当前折。最终融合规则使用全部 benchmark OOF 概率拟合，然后只在独立测试集上评估一次；独立集标签不参与权重、元模型或阈值选择。
 
+`v4c_oof_weighted_threshold_tuned` 是 v4a 的阈值调优对照：它在每个 benchmark meta 训练集上联合搜索手工分支权重 `alpha=0.00...1.00` 和分类阈值 `threshold=0.30...0.70`（步长均为 0.01），以固定的 ACC 为唯一选择指标。它不重新训练基础模型、不使用 GPU；独立测试集标签不参与 `alpha`、阈值或版本选择。
+
+```bash
+python train.py --version v4c_oof_weighted_threshold_tuned --dataset H_b --seed 42
+```
+
 五折固定为 `StratifiedKFold(n_splits=5, shuffle=True, random_state=42)`。每折训练 seed 依次为 42–46，按验证 ACC 选择最佳 epoch。独立测试集最终结果是五个折模型正类概率的平均值，不是五次测试指标的平均值。
+
+所有版本共享训练加载规则：训练集不足一个完整 batch 的尾批会被丢弃，以避免 BatchNorm 在单样本 batch 上无法计算统计量；验证集、benchmark OOF 和独立测试集始终保留全部样本。
 
 ## 输出
 

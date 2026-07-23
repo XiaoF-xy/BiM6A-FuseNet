@@ -110,6 +110,55 @@ def fit_weighted_rule(
     }
 
 
+def fit_weighted_threshold_rule(
+    rows: list[dict],
+    alpha_grid: Iterable[float] | None = None,
+    threshold_grid: Iterable[float] | None = None,
+) -> dict:
+    """Jointly select a probability weight and decision threshold using ACC only."""
+
+    labels, features = _arrays(rows)
+    alphas = np.asarray(
+        list(alpha_grid) if alpha_grid is not None else np.linspace(0.0, 1.0, 101),
+        dtype=float,
+    )
+    thresholds = np.asarray(
+        list(threshold_grid) if threshold_grid is not None else np.linspace(0.30, 0.70, 41),
+        dtype=float,
+    )
+    if alphas.size == 0 or not np.isfinite(alphas).all() or np.any((alphas < 0.0) | (alphas > 1.0)):
+        raise ValueError("alpha_grid must contain finite values in [0, 1].")
+    if thresholds.size == 0 or not np.isfinite(thresholds).all() or np.any((thresholds < 0.0) | (thresholds > 1.0)):
+        raise ValueError("threshold_grid must contain finite values in [0, 1].")
+
+    candidates = []
+    for alpha in alphas:
+        probabilities = alpha * features[:, 0] + (1.0 - alpha) * features[:, 1]
+        for threshold in thresholds:
+            candidates.append(
+                (
+                    float(np.mean((probabilities >= threshold) == labels)),
+                    -abs(float(threshold) - 0.5),
+                    -abs(float(alpha) - 0.5),
+                    -float(alpha),
+                    -float(threshold),
+                    float(alpha),
+                    float(threshold),
+                )
+            )
+    _, _, _, _, _, alpha, threshold = max(candidates, key=lambda item: item[:5])
+    probabilities = alpha * features[:, 0] + (1.0 - alpha) * features[:, 1]
+    metrics = compute_binary_metrics(labels, probabilities, threshold=threshold)
+    return {
+        "method": "weighted_probability_average_threshold_tuned",
+        "alpha_handcrafted": alpha,
+        "alpha_birna": 1.0 - alpha,
+        "selection_metric": "ACC",
+        "threshold": threshold,
+        "training_metrics": metrics,
+    }
+
+
 @dataclass
 class LogisticFusionRule:
     model: LogisticRegression
@@ -149,6 +198,8 @@ def fit_logistic_rule(rows: list[dict], seed: int) -> LogisticFusionRule:
 def _fit_rule(rows: list[dict], method: str, seed: int):
     if method == "weighted":
         return fit_weighted_rule(rows)
+    if method == "weighted_threshold":
+        return fit_weighted_threshold_rule(rows)
     if method == "logistic":
         return fit_logistic_rule(rows, seed=seed)
     raise ValueError(f"Unknown fusion method: {method}")
@@ -157,7 +208,10 @@ def _fit_rule(rows: list[dict], method: str, seed: int):
 def predict_with_rule(rule, rows: list[dict]) -> np.ndarray:
     if isinstance(rule, LogisticFusionRule):
         return rule.predict(rows)
-    if isinstance(rule, dict) and rule.get("method") == "weighted_probability_average":
+    if isinstance(rule, dict) and rule.get("method") in {
+        "weighted_probability_average",
+        "weighted_probability_average_threshold_tuned",
+    }:
         _, features = _arrays(rows)
         alpha = float(rule["alpha_handcrafted"])
         return alpha * features[:, 0] + (1.0 - alpha) * features[:, 1]
@@ -186,19 +240,22 @@ def cross_fit_meta_predictions(
         train_rows = [row for index, fold in enumerate(folds) if index != held_out_index for row in fold]
         rule = _fit_rule(train_rows, method=method, seed=seed + held_out_index)
         probabilities = predict_with_rule(rule, validation_rows)
+        threshold = float(rule_metadata(rule)["threshold"])
         fused_rows = [
             {
                 "sample_id": f"fold_{held_out_index + 1:02d}:{row['sample_id']}",
                 "sequence": row["sequence"],
                 "label": int(row["label"]),
                 "prob": float(probability),
-                "pred": int(probability >= 0.5),
+                "pred": int(probability >= threshold),
+                "threshold": threshold,
             }
             for row, probability in zip(validation_rows, probabilities)
         ]
         metrics = compute_binary_metrics(
             [row["label"] for row in fused_rows],
             [row["prob"] for row in fused_rows],
+            threshold=threshold,
         )
         output_rows.extend(fused_rows)
         fold_results.append(
@@ -290,10 +347,23 @@ def run_fusion_experiment(
     meta_oof_metrics = compute_binary_metrics(
         [row["label"] for row in meta_oof_rows],
         [row["prob"] for row in meta_oof_rows],
+        threshold=[row["threshold"] for row in meta_oof_rows],
     )
     fold_summary = summarize_metrics([result["metrics"] for result in fold_results])
     meta_oof_path = output_dir / "benchmark_meta_oof_predictions.csv"
-    write_prediction_file(meta_oof_path, meta_oof_rows)
+    write_prediction_file(
+        meta_oof_path,
+        [
+            {
+                "sample_id": row["sample_id"],
+                "sequence": row["sequence"],
+                "label": row["label"],
+                "prob": row["prob"],
+                "pred": row["pred"],
+            }
+            for row in meta_oof_rows
+        ],
+    )
     _write_meta_cv_csv(output_dir / "benchmark_cv_metrics.csv", fold_results, fold_summary)
     benchmark_payload = {
         "method": method,
@@ -312,19 +382,21 @@ def run_fusion_experiment(
     all_oof_rows = [row for fold in aligned_folds for row in fold]
     final_rule = _fit_rule(all_oof_rows, method=method, seed=seed)
     independent_probabilities = predict_with_rule(final_rule, aligned_independent)
+    final_threshold = float(rule_metadata(final_rule)["threshold"])
     independent_rows = [
         {
             "sample_id": row["sample_id"],
             "sequence": row["sequence"],
             "label": int(row["label"]),
             "prob": float(probability),
-            "pred": int(probability >= 0.5),
+            "pred": int(probability >= final_threshold),
         }
         for row, probability in zip(aligned_independent, independent_probabilities)
     ]
     independent_metrics = compute_binary_metrics(
         [row["label"] for row in independent_rows],
         [row["prob"] for row in independent_rows],
+        threshold=final_threshold,
     )
     independent_path = output_dir / "independent_ensemble_predictions.csv"
     write_prediction_file(independent_path, independent_rows)
@@ -344,7 +416,7 @@ def run_fusion_experiment(
     independent_payload = {
         "method": method,
         "probability_rule": rule_metadata(final_rule),
-        "threshold": 0.5,
+        "threshold": final_threshold,
         "base_versions": base_versions,
         "test_set_role": "final_evaluation_only",
         "independent_labels_used_for_fitting": False,
@@ -365,8 +437,8 @@ def run_fusion_experiment(
         "base_directories": base_directories,
         "benchmark_protocol": "five-fold base OOF plus fold-preserving meta cross-fit",
         "independent_protocol": "fit final rule on all benchmark OOF, evaluate independent ensembles once",
-        "selection_metric": "ACC" if method == "weighted" else None,
-        "threshold": 0.5,
+        "selection_metric": "ACC" if method in {"weighted", "weighted_threshold"} else None,
+        "threshold": final_threshold,
         "independent_labels_used_for_fitting": False,
     }
     with (output_dir / "resolved_config.json").open("w", encoding="utf-8") as handle:

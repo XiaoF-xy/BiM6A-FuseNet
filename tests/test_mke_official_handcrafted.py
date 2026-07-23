@@ -17,7 +17,9 @@ from mke_official_features import (  # noqa: E402
     chemical4_encode,
     official_mke_feature_matrix,
 )
+from dataset_utils import SequenceSample  # noqa: E402
 from model_mke_official import OfficialMKEClassifier, OfficialResidualBlock  # noqa: E402
+from train_cv import make_loader  # noqa: E402
 from training_control import EarlyStopping, build_optimizer, build_plateau_scheduler  # noqa: E402
 from training_utils import OfficialMKEDataCollator  # noqa: E402
 
@@ -98,6 +100,34 @@ def test_official_collator_builds_features_without_a_tokenizer():
     assert set(batch) == {"handcrafted_features", "labels", "sequences"}
     assert batch["handcrafted_features"].shape == (2, 13, 41)
     assert batch["labels"].tolist() == [1, 0]
+
+
+def test_shared_training_loader_drops_only_incomplete_tail_batches():
+    samples = [SequenceSample(sequence="A" * 41, label=index % 2) for index in range(65)]
+
+    train_loader = make_loader(
+        samples,
+        tokenizer=None,
+        max_length=64,
+        batch_size=64,
+        shuffle=False,
+        use_bpe_view=False,
+        use_official_mke_handcrafted=True,
+        drop_last=True,
+    )
+    evaluation_loader = make_loader(
+        samples,
+        tokenizer=None,
+        max_length=64,
+        batch_size=64,
+        shuffle=False,
+        use_bpe_view=False,
+        use_official_mke_handcrafted=True,
+        drop_last=False,
+    )
+
+    assert [len(batch["labels"]) for batch in train_loader] == [64]
+    assert [len(batch["labels"]) for batch in evaluation_loader] == [64, 1]
 
 
 def test_v2c_training_controls_use_adam_plateau_scheduler_and_acc_early_stopping():

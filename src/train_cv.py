@@ -354,6 +354,7 @@ def make_loader(
     use_handcrafted_features: bool = False,
     handcrafted_feature_names: list[str] | None = None,
     use_official_mke_handcrafted: bool = False,
+    drop_last: bool = False,
 ):
     if use_official_mke_handcrafted:
         collator = OfficialMKEDataCollator()
@@ -376,6 +377,7 @@ def make_loader(
         shuffle=shuffle,
         collate_fn=collator,
         num_workers=0,
+        drop_last=drop_last,
     )
 
 
@@ -519,6 +521,7 @@ def train_one_fold(
         use_handcrafted_features=args.use_handcrafted_features,
         handcrafted_feature_names=args.handcrafted_feature_names,
         use_official_mke_handcrafted=args.use_official_mke_handcrafted,
+        drop_last=True,
     )
     val_loader = make_loader(
         val_samples,
@@ -531,6 +534,7 @@ def train_one_fold(
         use_handcrafted_features=args.use_handcrafted_features,
         handcrafted_feature_names=args.handcrafted_feature_names,
         use_official_mke_handcrafted=args.use_official_mke_handcrafted,
+        drop_last=False,
     )
     test_loader = make_loader(
         independent_test_samples,
@@ -543,6 +547,7 @@ def train_one_fold(
         use_handcrafted_features=args.use_handcrafted_features,
         handcrafted_feature_names=args.handcrafted_feature_names,
         use_official_mke_handcrafted=args.use_official_mke_handcrafted,
+        drop_last=False,
     )
     batch_scheduler = build_constant_warmup_scheduler(
         optimizer,

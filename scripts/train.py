@@ -27,6 +27,10 @@ FUSION_VERSIONS = {
         "method": "weighted",
         "model_label": "BiM6A-FuseNet-v4a",
     },
+    "v4c_oof_weighted_threshold_tuned": {
+        "method": "weighted_threshold",
+        "model_label": "BiM6A-FuseNet-v4c",
+    },
     "v4b_oof_logistic_stacking": {
         "method": "logistic",
         "model_label": "BiM6A-FuseNet-v4b",

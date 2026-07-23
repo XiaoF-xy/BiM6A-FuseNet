@@ -168,6 +168,7 @@ def test_v2c_training_options_do_not_leak_into_existing_versions():
     [
         ("v4a_oof_weighted_late_fusion", "weighted"),
         ("v4b_oof_logistic_stacking", "logistic"),
+        ("v4c_oof_weighted_threshold_tuned", "weighted_threshold"),
     ],
 )
 def test_v4_versions_dispatch_to_prediction_fusion(version, method, tmp_path: Path):

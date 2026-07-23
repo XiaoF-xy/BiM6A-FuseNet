@@ -21,7 +21,7 @@ def parse_args():
         description="Fuse completed handcrafted and BiRNA strict-CV predictions without retraining."
     )
     parser.add_argument("--version", required=True)
-    parser.add_argument("--method", required=True, choices=["weighted", "logistic"])
+    parser.add_argument("--method", required=True, choices=["weighted", "weighted_threshold", "logistic"])
     parser.add_argument("--model_label", required=True)
     parser.add_argument("--dataset", default="H_b")
     parser.add_argument("--seed", type=int, default=42)

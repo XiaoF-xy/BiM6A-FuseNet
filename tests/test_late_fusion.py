@@ -16,6 +16,7 @@ from late_fusion import (
     cross_fit_meta_predictions,
     fit_logistic_rule,
     fit_weighted_rule,
+    fit_weighted_threshold_rule,
     run_fusion_experiment,
 )
 
@@ -89,6 +90,23 @@ def test_weighted_rule_selects_acc_maximizing_probability_average():
     assert rule["training_metrics"]["ACC"] == pytest.approx(1.0)
 
 
+def test_weighted_threshold_rule_jointly_selects_alpha_and_acc_optimal_threshold():
+    rows = align_prediction_rows(
+        prediction_rows([0, 1], [0.6, 0.7]),
+        prediction_rows([0, 1], [0.1, 0.2]),
+    )
+
+    rule = fit_weighted_threshold_rule(
+        rows,
+        alpha_grid=[0.0, 0.5, 1.0],
+        threshold_grid=[0.4, 0.5],
+    )
+
+    assert rule["alpha_handcrafted"] == pytest.approx(0.5)
+    assert rule["threshold"] == pytest.approx(0.4)
+    assert rule["training_metrics"]["ACC"] == pytest.approx(1.0)
+
+
 def test_logistic_rule_uses_both_base_probabilities():
     rows = align_prediction_rows(
         prediction_rows([0, 0, 1, 1], [0.1, 0.2, 0.8, 0.9]),
@@ -120,11 +138,26 @@ def test_meta_cross_fit_never_trains_on_held_out_fold():
     assert all(result["meta_validation_size"] == 4 for result in fold_results)
 
 
+def test_weighted_threshold_meta_cross_fit_applies_each_fold_threshold():
+    folds = []
+    for _ in range(5):
+        handcrafted = prediction_rows([0, 1], [0.7, 0.8])
+        birna = prediction_rows([0, 1], [0.6, 0.7])
+        folds.append(align_prediction_rows(handcrafted, birna))
+
+    rows, fold_results = cross_fit_meta_predictions(folds, method="weighted_threshold", seed=42)
+
+    assert all(result["rule"]["threshold"] == pytest.approx(0.61) for result in fold_results)
+    assert all(result["metrics"]["ACC"] == pytest.approx(1.0) for result in fold_results)
+    assert [row["pred"] for row in rows] == [0, 1] * 5
+
+
 @pytest.mark.parametrize(
     ("method", "version"),
     [
         ("weighted", "v4a_oof_weighted_late_fusion"),
         ("logistic", "v4b_oof_logistic_stacking"),
+        ("weighted_threshold", "v4c_oof_weighted_threshold_tuned"),
     ],
 )
 def test_run_fusion_experiment_writes_paper_ready_artifacts(tmp_path: Path, method: str, version: str):
